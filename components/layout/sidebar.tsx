@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { TrendingUp, BarChart3, Building2, Banknote, Globe, Bitcoin, Briefcase, LayoutDashboard, Settings, ChevronLeft, Flame, X, CalendarDays } from "lucide-react"
+import { TrendingUp, BarChart3, Building2, Banknote, Globe, Bitcoin, Briefcase, LayoutDashboard, Settings, ChevronLeft, Flame, X, CalendarDays, SlidersHorizontal } from "lucide-react"
 import { useState } from "react"
 
 const navItems = [
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/simulador", label: "Simulador FIRE", icon: Flame },
   { href: "/comparador", label: "Comparador", icon: Globe },
+  { href: "/screener", label: "Screener", icon: SlidersHorizontal },
 ]
 
 interface SidebarProps {
