@@ -8,6 +8,8 @@ import { formatCurrency, formatPercent, variationColor } from "@/lib/utils"
 import { AddTransactionDialog } from "@/components/features/portfolio/add-transaction-dialog"
 import { AllocationChart } from "@/components/features/portfolio/allocation-chart"
 import { DividendProjection } from "@/components/features/portfolio/dividend-projection"
+import { PortfolioNotesDialog } from "@/components/features/portfolio/portfolio-notes-dialog"
+import { ImportCsvDialog } from "@/components/features/portfolio/import-csv-dialog"
 import { TrendingUp, DollarSign, BarChart3, PlusCircle } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -84,7 +86,11 @@ export default async function PortfolioPage() {
           <h1 className="text-xl md:text-2xl font-bold">{portfolio.name}</h1>
           <p className="text-muted-foreground">Acompanhe seus investimentos em tempo real</p>
         </div>
-        <AddTransactionDialog portfolioId={portfolio.id} />
+        <div className="flex gap-2 sm:ml-auto flex-wrap">
+          <AddTransactionDialog portfolioId={portfolio.id} />
+          <ImportCsvDialog portfolioId={portfolio.id} />
+          <PortfolioNotesDialog portfolioId={portfolio.id} initialNotes={portfolio.notes} initialGoal={portfolio.goalValue} />
+        </div>
       </div>
 
       {isEmpty ? (
@@ -128,6 +134,30 @@ export default async function PortfolioPage() {
               )
             })}
           </div>
+
+          {/* Goal progress */}
+          {portfolio.goalValue && portfolio.goalValue > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="font-medium">Meta patrimonial</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatCurrency(summary.totalValue)} / {formatCurrency(portfolio.goalValue)}
+                    {" "}({Math.min((summary.totalValue / portfolio.goalValue) * 100, 100).toFixed(1)}%)
+                  </span>
+                </div>
+                <div className="h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${Math.min((summary.totalValue / portfolio.goalValue) * 100, 100)}%` }}
+                  />
+                </div>
+                {portfolio.notes && (
+                  <p className="text-xs text-muted-foreground mt-3 whitespace-pre-wrap">{portfolio.notes}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Charts */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

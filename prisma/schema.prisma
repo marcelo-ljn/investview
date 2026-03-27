@@ -354,6 +354,8 @@ model Portfolio {
   name        String
   color       String   @default("#3B82F6")
   isDefault   Boolean  @default(false)
+  notes       String?
+  goalValue   Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
