@@ -1,11 +1,15 @@
 import { fetchQuote, fetchHistory, fetchDividends } from "@/lib/brapi"
+import { fetchSELIC } from "@/lib/bcb"
 import { notFound } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VariationBadge } from "@/components/ui/variation-badge"
-import { formatCurrency, formatCompact, formatPercent } from "@/lib/utils"
+import { formatCurrency, formatCompact } from "@/lib/utils"
 import { StockChart } from "@/components/features/acoes/stock-chart"
 import { DividendChart } from "@/components/features/acoes/dividend-chart"
+import { PrecoJusto } from "@/components/features/acoes/preco-justo"
+import { BHChecklist } from "@/components/features/acoes/bh-checklist"
+import { BenchmarkChart } from "@/components/features/acoes/benchmark-chart"
 import Image from "next/image"
 import type { Metadata } from "next"
 
@@ -22,13 +26,17 @@ export default async function StockDetailPage({ params }: Props) {
   const { ticker } = await params
   const upper = ticker.toUpperCase()
 
-  const [quote, history, dividends] = await Promise.all([
+  const [quote, history, dividends, ibovHistory, selic] = await Promise.all([
     fetchQuote(upper),
     fetchHistory(upper, "1y", "1d"),
     fetchDividends(upper),
+    fetchHistory("^BVSP", "1y", "1d").catch(() => null),
+    fetchSELIC().catch(() => null),
   ])
 
   if (!quote) notFound()
+
+  const selicAnnual = selic ? selic.value / 100 : 0.1075
 
   const fundamentals = [
     { label: "P/L", value: quote.priceEarnings?.toFixed(1) ?? "—" },
@@ -58,7 +66,7 @@ export default async function StockDetailPage({ params }: Props) {
           <p className="text-muted-foreground">{quote.longName ?? quote.shortName}</p>
           {quote.sector && <p className="text-xs text-muted-foreground mt-0.5">{quote.sector}</p>}
         </div>
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <p className="text-3xl font-bold tabular-nums">{formatCurrency(quote.regularMarketPrice)}</p>
           <p className={`text-sm tabular-nums ${quote.regularMarketChange >= 0 ? "text-emerald-500" : "text-red-500"}`}>
             {quote.regularMarketChange >= 0 ? "+" : ""}{formatCurrency(quote.regularMarketChange)}
@@ -66,13 +74,13 @@ export default async function StockDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* OHLCV bar */}
+      {/* OHLCV */}
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm pb-1">
         {[
           { label: "Abertura", value: formatCurrency(quote.regularMarketOpen) },
           { label: "Máxima", value: formatCurrency(quote.regularMarketDayHigh) },
           { label: "Mínima", value: formatCurrency(quote.regularMarketDayLow) },
-          { label: "Fechamento ant.", value: formatCurrency(quote.regularMarketPreviousClose) },
+          { label: "Fech. ant.", value: formatCurrency(quote.regularMarketPreviousClose) },
           { label: "Volume", value: formatCompact(quote.regularMarketVolume) },
         ].map((item) => (
           <div key={item.label}>
@@ -83,10 +91,13 @@ export default async function StockDetailPage({ params }: Props) {
       </div>
 
       <Tabs defaultValue="chart">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="chart">Gráfico</TabsTrigger>
           <TabsTrigger value="fundamentals">Fundamentos</TabsTrigger>
           <TabsTrigger value="dividends">Dividendos</TabsTrigger>
+          <TabsTrigger value="preco-justo">Preço Justo</TabsTrigger>
+          <TabsTrigger value="analise">Análise B&amp;H</TabsTrigger>
+          <TabsTrigger value="comparativo">Comparativo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="chart" className="mt-4">
@@ -108,6 +119,34 @@ export default async function StockDetailPage({ params }: Props) {
 
         <TabsContent value="dividends" className="mt-4">
           <DividendChart dividends={dividends} ticker={upper} />
+        </TabsContent>
+
+        <TabsContent value="preco-justo" className="mt-4">
+          <PrecoJusto
+            price={quote.regularMarketPrice}
+            eps={quote.earningsPerShare}
+            priceToBook={quote.priceToBook}
+            dividendsYield={quote.dividendsYield}
+          />
+        </TabsContent>
+
+        <TabsContent value="analise" className="mt-4">
+          <BHChecklist
+            price={quote.regularMarketPrice}
+            pl={quote.priceEarnings}
+            pvp={quote.priceToBook}
+            dy={quote.dividendsYield}
+            eps={quote.earningsPerShare}
+          />
+        </TabsContent>
+
+        <TabsContent value="comparativo" className="mt-4">
+          <BenchmarkChart
+            stockHistory={history ?? []}
+            ibovHistory={ibovHistory ?? []}
+            selicAnnual={selicAnnual}
+            ticker={upper}
+          />
         </TabsContent>
       </Tabs>
     </div>
