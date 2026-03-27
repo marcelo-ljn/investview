@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { VariationBadge } from "@/components/ui/variation-badge"
 import { formatCurrency, formatPercent, variationColor } from "@/lib/utils"
 import { AddTransactionDialog } from "@/components/features/portfolio/add-transaction-dialog"
+import { AllocationChart } from "@/components/features/portfolio/allocation-chart"
+import { DividendProjection } from "@/components/features/portfolio/dividend-projection"
 import { TrendingUp, DollarSign, BarChart3, PlusCircle } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -41,7 +43,7 @@ export default async function PortfolioPage() {
     ticker: string; assetType: string; quantity: number; averagePrice: number;
     currentPrice: number; totalCost: number; currentValue: number;
     gain: number; gainPercent: number; changePercent: number;
-    name: string; logoUrl?: string | null; weight: number;
+    name: string; logoUrl?: string | null; weight: number; dividendsYield?: number | null;
   }> = []
   let summary = { totalValue: 0, totalCost: 0, totalGain: 0, totalGainPercent: 0 }
 
@@ -62,6 +64,7 @@ export default async function PortfolioPage() {
         averagePrice: p.averagePrice, currentPrice, totalCost, currentValue,
         gain, gainPercent, changePercent: quote?.regularMarketChangePercent ?? 0,
         name: quote?.shortName ?? p.ticker, logoUrl: quote?.logourl, weight: 0,
+        dividendsYield: quote?.dividendsYield,
       }
     })
 
@@ -124,6 +127,17 @@ export default async function PortfolioPage() {
                 </Card>
               )
             })}
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <Card>
+              <CardContent className="p-5">
+                <p className="text-sm font-medium mb-4">Alocação</p>
+                <AllocationChart positions={positions} totalValue={summary.totalValue} />
+              </CardContent>
+            </Card>
+            <DividendProjection positions={positions} />
           </div>
 
           {/* Positions table */}
