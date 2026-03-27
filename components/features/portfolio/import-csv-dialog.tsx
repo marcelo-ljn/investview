@@ -73,7 +73,8 @@ export function ImportCsvDialog({ portfolioId }: Props) {
         <div className="space-y-4 pt-2">
           <div className="text-sm text-muted-foreground space-y-1">
             <p>Formato: <code className="bg-muted px-1 rounded">TICKER,TIPO,QUANTIDADE,PRECO_MEDIO</code></p>
-            <p>Tipos válidos: <code className="bg-muted px-1 rounded">STOCK</code>, <code className="bg-muted px-1 rounded">FII</code>, <code className="bg-muted px-1 rounded">ETF</code>, <code className="bg-muted px-1 rounded">CRYPTO</code></p>
+            <p>Tipos: <code className="bg-muted px-1 rounded">STOCK</code> <code className="bg-muted px-1 rounded">FII</code> <code className="bg-muted px-1 rounded">ETF</code> <code className="bg-muted px-1 rounded">CRYPTO</code> <code className="bg-muted px-1 rounded">FIXED_INCOME</code> <code className="bg-muted px-1 rounded">OTHER</code></p>
+            <p className="text-xs">Para FIXED_INCOME e OTHER: use quantidade=1 e preço=valor atual</p>
           </div>
           <Textarea
             placeholder={EXAMPLE}
