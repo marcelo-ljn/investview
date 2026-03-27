@@ -44,8 +44,8 @@ export default async function AcoesPage() {
                 <th className="text-right p-4 font-medium text-muted-foreground">Variação D</th>
                 <th className="text-right p-4 font-medium text-muted-foreground hidden md:table-cell">Máx 52s</th>
                 <th className="text-right p-4 font-medium text-muted-foreground hidden md:table-cell">Mín 52s</th>
-                <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">Volume</th>
-                <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">P/L</th>
+                <th className="text-right p-4 font-medium text-muted-foreground hidden sm:table-cell">Volume</th>
+                <th className="text-right p-4 font-medium text-muted-foreground hidden sm:table-cell">P/L</th>
                 <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">D.Y.</th>
               </tr>
             </thead>
@@ -79,10 +79,10 @@ export default async function AcoesPage() {
                   <td className="p-4 text-right tabular-nums text-muted-foreground hidden md:table-cell">
                     {q.fiftyTwoWeekLow ? formatCurrency(q.fiftyTwoWeekLow) : "—"}
                   </td>
-                  <td className="p-4 text-right tabular-nums text-muted-foreground hidden lg:table-cell">
+                  <td className="p-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                     {q.regularMarketVolume ? formatCompact(q.regularMarketVolume) : "—"}
                   </td>
-                  <td className="p-4 text-right tabular-nums hidden lg:table-cell">
+                  <td className="p-4 text-right tabular-nums hidden sm:table-cell">
                     {q.priceEarnings ? q.priceEarnings.toFixed(1) : "—"}
                   </td>
                   <td className="p-4 text-right tabular-nums hidden lg:table-cell">

@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { TrendingUp, BarChart3, Building2, Banknote, Globe, Bitcoin, Briefcase, LayoutDashboard, Settings, ChevronLeft, Flame } from "lucide-react"
+import { TrendingUp, BarChart3, Building2, Banknote, Globe, Bitcoin, Briefcase, LayoutDashboard, Settings, ChevronLeft, Flame, X } from "lucide-react"
 import { useState } from "react"
 
 const navItems = [
@@ -17,21 +17,31 @@ const navItems = [
   { href: "/comparador", label: "Comparador", icon: Globe },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+}
+
+export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
-  return (
-    <aside className={cn(
-      "flex flex-col h-full border-r border-border bg-card transition-all duration-300",
-      collapsed ? "w-[60px]" : "w-[220px]"
-    )}>
+  const navContent = (isMobile = false) => (
+    <>
       {/* Logo */}
-      <div className={cn("flex items-center gap-2 p-4 border-b border-border", collapsed && "justify-center")}>
+      <div className={cn(
+        "flex items-center gap-2 p-4 border-b border-border",
+        !isMobile && collapsed ? "justify-center" : ""
+      )}>
         <div className="rounded-lg bg-primary p-1.5 shrink-0">
           <TrendingUp className="h-4 w-4 text-primary-foreground" />
         </div>
-        {!collapsed && <span className="font-bold text-sm">InvestView</span>}
+        {(isMobile || !collapsed) && <span className="font-bold text-sm">InvestView</span>}
+        {isMobile && (
+          <button onClick={onMobileClose} className="ml-auto p-1 rounded hover:bg-accent">
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
@@ -43,17 +53,18 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={isMobile ? onMobileClose : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                 isActive
                   ? "bg-primary/10 text-primary font-medium"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                collapsed && "justify-center px-2"
+                !isMobile && collapsed ? "justify-center px-2" : ""
               )}
-              title={collapsed ? item.label : undefined}
+              title={!isMobile && collapsed ? item.label : undefined}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed && item.label}
+              {(isMobile || !collapsed) && item.label}
             </Link>
           )
         })}
@@ -61,18 +72,47 @@ export function Sidebar() {
 
       {/* Bottom */}
       <div className="p-2 border-t border-border space-y-0.5">
-        <Link href="/perfil" className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors", collapsed && "justify-center px-2")}>
-          <Settings className="h-4 w-4 shrink-0" />
-          {!collapsed && "Configurações"}
-        </Link>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+        <Link
+          href="/perfil"
+          onClick={isMobile ? onMobileClose : undefined}
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+            !isMobile && collapsed ? "justify-center px-2" : ""
+          )}
         >
-          <ChevronLeft className={cn("h-4 w-4 shrink-0 transition-transform", collapsed && "rotate-180")} />
-          {!collapsed && "Recolher"}
-        </button>
+          <Settings className="h-4 w-4 shrink-0" />
+          {(isMobile || !collapsed) && "Configurações"}
+        </Link>
+        {!isMobile && (
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <ChevronLeft className={cn("h-4 w-4 shrink-0 transition-transform", collapsed && "rotate-180")} />
+            {!collapsed && "Recolher"}
+          </button>
+        )}
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className={cn(
+        "hidden md:flex flex-col h-full border-r border-border bg-card transition-all duration-300",
+        collapsed ? "w-[60px]" : "w-[220px]"
+      )}>
+        {navContent(false)}
+      </aside>
+
+      {/* Mobile drawer */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-30 flex flex-col w-[280px] border-r border-border bg-card transition-transform duration-300 md:hidden",
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        {navContent(true)}
+      </aside>
+    </>
   )
 }

@@ -69,7 +69,7 @@ export function ComparadorClient({ initialTickers, quotes }: ComparadorClientPro
                   value={input}
                   onChange={e => setInput(e.target.value.toUpperCase())}
                   onKeyDown={e => e.key === "Enter" && add()}
-                  className="w-28 h-8 text-xs"
+                  className="w-full sm:w-28 min-w-[80px] h-8 text-xs"
                 />
                 <Button size="sm" onClick={add} className="h-8 gap-1">
                   <Plus className="h-3 w-3" /> Adicionar
@@ -88,10 +88,10 @@ export function ComparadorClient({ initialTickers, quotes }: ComparadorClientPro
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left p-3 font-medium text-muted-foreground">Métrica</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground sticky left-0 bg-card z-10">Métrica</th>
                     {quotes.map((q, i) => (
                       <th key={q.symbol} className="text-right p-3 font-medium" style={{ color: COLORS[i] }}>
                         {q.symbol}
@@ -102,7 +102,7 @@ export function ComparadorClient({ initialTickers, quotes }: ComparadorClientPro
                 <tbody>
                   {metrics.map(m => (
                     <tr key={m.label} className="border-b border-border last:border-0 hover:bg-muted/30">
-                      <td className="p-3 text-muted-foreground">{m.label}</td>
+                      <td className="p-3 text-muted-foreground sticky left-0 bg-card z-10">{m.label}</td>
                       {quotes.map(q => (
                         <td key={q.symbol} className="p-3 text-right tabular-nums">
                           {m.getVariation ? (
@@ -115,13 +115,13 @@ export function ComparadorClient({ initialTickers, quotes }: ComparadorClientPro
                     </tr>
                   ))}
                   <tr className="border-b border-border">
-                    <td className="p-3 text-muted-foreground">Nome</td>
+                    <td className="p-3 text-muted-foreground sticky left-0 bg-card z-10">Nome</td>
                     {quotes.map(q => (
                       <td key={q.symbol} className="p-3 text-right text-xs text-muted-foreground">{q.shortName}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="p-3 text-muted-foreground">Setor</td>
+                    <td className="p-3 text-muted-foreground sticky left-0 bg-card z-10">Setor</td>
                     {quotes.map(q => (
                       <td key={q.symbol} className="p-3 text-right text-xs text-muted-foreground">{q.sector ?? "—"}</td>
                     ))}

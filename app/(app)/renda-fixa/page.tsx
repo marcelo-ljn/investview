@@ -47,14 +47,14 @@ export default async function RendaFixaPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Renda Fixa</h1>
+        <h1 className="text-xl md:text-2xl font-bold">Renda Fixa</h1>
         <p className="text-muted-foreground">Tesouro Direto, CDB, LCI/LCA e simulador de investimentos</p>
       </div>
 
       {/* Rate Cards */}
       <section>
         <h2 className="text-sm font-medium text-muted-foreground mb-3">Taxas de Referência</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {rateCards.map((r) => {
             const Icon = r.icon
             return (
@@ -90,8 +90,8 @@ export default async function RendaFixaPage() {
                   <th className="text-left p-4 font-medium text-muted-foreground">Tipo</th>
                   <th className="text-right p-4 font-medium text-muted-foreground">Vencimento</th>
                   <th className="text-right p-4 font-medium text-muted-foreground">Taxa (compra)</th>
-                  <th className="text-right p-4 font-medium text-muted-foreground">Preço (compra)</th>
-                  <th className="text-right p-4 font-medium text-muted-foreground">Mínimo</th>
+                  <th className="text-right p-4 font-medium text-muted-foreground hidden sm:table-cell">Preço (compra)</th>
+                  <th className="text-right p-4 font-medium text-muted-foreground hidden sm:table-cell">Mínimo</th>
                 </tr>
               </thead>
               <tbody>
@@ -111,8 +111,8 @@ export default async function RendaFixaPage() {
                     <td className="p-4 text-right tabular-nums font-semibold text-emerald-500">
                       {b.buyRate > 0 ? `${b.buyRate.toFixed(2)}%` : "—"}
                     </td>
-                    <td className="p-4 text-right tabular-nums">{b.buyPrice > 0 ? formatCurrency(b.buyPrice) : "—"}</td>
-                    <td className="p-4 text-right tabular-nums">{formatCurrency(b.minAmount)}</td>
+                    <td className="p-4 text-right tabular-nums hidden sm:table-cell">{b.buyPrice > 0 ? formatCurrency(b.buyPrice) : "—"}</td>
+                    <td className="p-4 text-right tabular-nums hidden sm:table-cell">{formatCurrency(b.minAmount)}</td>
                   </tr>
                 ))}
               </tbody>

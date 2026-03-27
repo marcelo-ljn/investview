@@ -76,9 +76,9 @@ export default async function PortfolioPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{portfolio.name}</h1>
+          <h1 className="text-xl md:text-2xl font-bold">{portfolio.name}</h1>
           <p className="text-muted-foreground">Acompanhe seus investimentos em tempo real</p>
         </div>
         <AddTransactionDialog portfolioId={portfolio.id} />
@@ -100,7 +100,7 @@ export default async function PortfolioPage() {
       ) : (
         <>
           {/* Summary */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: "Patrimônio total", value: formatCurrency(summary.totalValue), icon: DollarSign, color: "text-blue-500 bg-blue-500/10" },
               { label: "Custo total", value: formatCurrency(summary.totalCost), icon: DollarSign, color: "text-zinc-400 bg-zinc-400/10" },

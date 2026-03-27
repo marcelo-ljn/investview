@@ -26,7 +26,7 @@ export default async function CriptoPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Criptomoedas</h1>
+        <h1 className="text-xl md:text-2xl font-bold">Criptomoedas</h1>
         <p className="text-muted-foreground">Top 20 por market cap, cotações em BRL</p>
       </div>
 

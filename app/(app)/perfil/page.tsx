@@ -16,11 +16,11 @@ export default async function PerfilPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold">Meu Perfil</h1>
+      <h1 className="text-xl md:text-2xl font-bold">Meu Perfil</h1>
 
       <Card>
         <CardContent className="p-6">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
             <Avatar className="h-16 w-16">
               <AvatarImage src={user.image ?? ""} />
               <AvatarFallback className="text-lg">{user.name?.slice(0, 2).toUpperCase()}</AvatarFallback>

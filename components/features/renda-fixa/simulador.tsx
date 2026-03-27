@@ -124,7 +124,7 @@ export function RendaFixaSimulador({ cdi, ipca, selic }: SimuladorProps) {
       {/* Results + Chart */}
       <div className="lg:col-span-2 space-y-4">
         {/* Result Cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Total investido</p>
@@ -153,6 +153,7 @@ export function RendaFixaSimulador({ cdi, ipca, selic }: SimuladorProps) {
             <CardTitle className="text-sm">Evolução patrimonial</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="w-full min-h-[200px]">
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={chartData}>
                 <defs>
@@ -179,6 +180,7 @@ export function RendaFixaSimulador({ cdi, ipca, selic }: SimuladorProps) {
                 <Area type="monotone" dataKey="Valor líquido" stroke="#10b981" fill="url(#colorNet)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>

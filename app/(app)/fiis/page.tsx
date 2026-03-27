@@ -36,7 +36,7 @@ export default async function FIIsPage() {
                 <th className="text-right p-4 font-medium text-muted-foreground">Variação D</th>
                 <th className="text-right p-4 font-medium text-muted-foreground hidden md:table-cell">DY (12M)</th>
                 <th className="text-right p-4 font-medium text-muted-foreground hidden md:table-cell">P/VP</th>
-                <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">Volume</th>
+                <th className="text-right p-4 font-medium text-muted-foreground hidden sm:table-cell">Volume</th>
               </tr>
             </thead>
             <tbody>
@@ -69,7 +69,7 @@ export default async function FIIsPage() {
                   <td className="p-4 text-right tabular-nums hidden md:table-cell">
                     {q.priceToBook ? q.priceToBook.toFixed(2) : "—"}
                   </td>
-                  <td className="p-4 text-right tabular-nums text-muted-foreground hidden lg:table-cell">
+                  <td className="p-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                     {q.regularMarketVolume ? formatCurrency(q.regularMarketVolume) : "—"}
                   </td>
                 </tr>

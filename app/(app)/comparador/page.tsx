@@ -20,7 +20,7 @@ export default async function ComparadorPage({ searchParams }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Comparador de Ativos</h1>
+        <h1 className="text-xl md:text-2xl font-bold">Comparador de Ativos</h1>
         <p className="text-muted-foreground">Compare até 5 ativos lado a lado (ações, FIIs, ETFs)</p>
       </div>
       <ComparadorClient initialTickers={tickers} quotes={quotes} />

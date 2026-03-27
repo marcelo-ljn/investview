@@ -20,7 +20,7 @@ export default async function ETFsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">ETFs</h1>
+        <h1 className="text-xl md:text-2xl font-bold">ETFs</h1>
         <p className="text-muted-foreground">Exchange Traded Funds brasileiros e internacionais</p>
       </div>
 

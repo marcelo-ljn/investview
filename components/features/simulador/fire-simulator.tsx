@@ -131,7 +131,7 @@ export function FIRESimulator() {
         {/* Results */}
         <div className="lg:col-span-2 space-y-4">
           {/* Scenario cards */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { label: "Conservador", anos: anosConservador, color: "text-red-500", bg: "bg-red-500/10", icon: "🐢" },
               { label: "Moderado", anos: anosModerate, color: "text-amber-500", bg: "bg-amber-500/10", icon: "⚖️" },

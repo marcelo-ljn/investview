@@ -44,7 +44,7 @@ export default async function StockDetailPage({ params }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col sm:flex-row items-start gap-4">
         {quote.logourl && (
           <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0 border border-border">
             <Image src={quote.logourl} alt={upper} width={48} height={48} className="object-cover" />
@@ -52,7 +52,7 @@ export default async function StockDetailPage({ params }: Props) {
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold">{upper}</h1>
+            <h1 className="text-xl md:text-2xl font-bold">{upper}</h1>
             <VariationBadge value={quote.regularMarketChangePercent} />
           </div>
           <p className="text-muted-foreground">{quote.longName ?? quote.shortName}</p>
@@ -67,7 +67,7 @@ export default async function StockDetailPage({ params }: Props) {
       </div>
 
       {/* OHLCV bar */}
-      <div className="flex gap-6 text-sm overflow-x-auto pb-1">
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm pb-1">
         {[
           { label: "Abertura", value: formatCurrency(quote.regularMarketOpen) },
           { label: "Máxima", value: formatCurrency(quote.regularMarketDayHigh) },
@@ -75,7 +75,7 @@ export default async function StockDetailPage({ params }: Props) {
           { label: "Fechamento ant.", value: formatCurrency(quote.regularMarketPreviousClose) },
           { label: "Volume", value: formatCompact(quote.regularMarketVolume) },
         ].map((item) => (
-          <div key={item.label} className="shrink-0">
+          <div key={item.label}>
             <p className="text-muted-foreground text-xs">{item.label}</p>
             <p className="font-medium tabular-nums">{item.value}</p>
           </div>
