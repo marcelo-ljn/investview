@@ -1,5 +1,4 @@
 import { fetchQuote, fetchHistory, fetchDividends } from "@/lib/brapi"
-import { fetchSELIC } from "@/lib/bcb"
 import { notFound } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -7,10 +6,8 @@ import { VariationBadge } from "@/components/ui/variation-badge"
 import { formatCurrency, formatCompact } from "@/lib/utils"
 import { StockChart } from "@/components/features/acoes/stock-chart"
 import { DividendChart } from "@/components/features/acoes/dividend-chart"
-import { PrecoJusto } from "@/components/features/acoes/preco-justo"
-import { BHChecklist } from "@/components/features/acoes/bh-checklist"
 import { BenchmarkChart } from "@/components/features/acoes/benchmark-chart"
-import { SeInvestisse } from "@/components/features/acoes/se-investisse"
+import { fetchSELIC } from "@/lib/bcb"
 import Image from "next/image"
 import type { Metadata } from "next"
 
@@ -23,37 +20,34 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: ticker.toUpperCase() }
 }
 
-export default async function StockDetailPage({ params }: Props) {
+export default async function ETFDetailPage({ params }: Props) {
   const { ticker } = await params
   const upper = ticker.toUpperCase()
 
-  const [quote, history, dividends, ibovHistory, selic, history5y] = await Promise.all([
+  const [quote, history, dividends, ibovHistory, selic] = await Promise.all([
     fetchQuote(upper),
     fetchHistory(upper, "1y", "1d"),
     fetchDividends(upper),
     fetchHistory("^BVSP", "1y", "1d").catch(() => null),
     fetchSELIC().catch(() => null),
-    fetchHistory(upper, "5y", "1wk").catch(() => null),
   ])
 
   if (!quote) notFound()
 
   const selicAnnual = selic ? selic.value / 100 : 0.1075
 
-  const fundamentals = [
-    { label: "P/L", value: quote.priceEarnings?.toFixed(1) ?? "—" },
+  const metrics = [
+    { label: "Preço", value: formatCurrency(quote.regularMarketPrice) },
     { label: "P/VP", value: quote.priceToBook?.toFixed(2) ?? "—" },
-    { label: "D.Y.", value: quote.dividendsYield ? `${(quote.dividendsYield * 100).toFixed(2)}%` : "—" },
-    { label: "LPA", value: quote.earningsPerShare ? formatCurrency(quote.earningsPerShare) : "—" },
+    { label: "DY (12M)", value: quote.dividendsYield ? `${(quote.dividendsYield * 100).toFixed(2)}%` : "—" },
     { label: "Market Cap", value: quote.marketCap ? formatCompact(quote.marketCap) : "—" },
-    { label: "Volume", value: quote.regularMarketVolume ? formatCompact(quote.regularMarketVolume) : "—" },
+    { label: "Volume", value: formatCompact(quote.regularMarketVolume) },
     { label: "Máx 52s", value: quote.fiftyTwoWeekHigh ? formatCurrency(quote.fiftyTwoWeekHigh) : "—" },
     { label: "Mín 52s", value: quote.fiftyTwoWeekLow ? formatCurrency(quote.fiftyTwoWeekLow) : "—" },
   ]
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start gap-4">
         {quote.logourl && (
           <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0 border border-border">
@@ -66,7 +60,6 @@ export default async function StockDetailPage({ params }: Props) {
             <VariationBadge value={quote.regularMarketChangePercent} />
           </div>
           <p className="text-muted-foreground">{quote.longName ?? quote.shortName}</p>
-          {quote.sector && <p className="text-xs text-muted-foreground mt-0.5">{quote.sector}</p>}
         </div>
         <div className="text-right shrink-0">
           <p className="text-3xl font-bold tabular-nums">{formatCurrency(quote.regularMarketPrice)}</p>
@@ -76,71 +69,30 @@ export default async function StockDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* OHLCV */}
-      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm pb-1">
-        {[
-          { label: "Abertura", value: formatCurrency(quote.regularMarketOpen) },
-          { label: "Máxima", value: formatCurrency(quote.regularMarketDayHigh) },
-          { label: "Mínima", value: formatCurrency(quote.regularMarketDayLow) },
-          { label: "Fech. ant.", value: formatCurrency(quote.regularMarketPreviousClose) },
-          { label: "Volume", value: formatCompact(quote.regularMarketVolume) },
-        ].map((item) => (
-          <div key={item.label}>
-            <p className="text-muted-foreground text-xs">{item.label}</p>
-            <p className="font-medium tabular-nums">{item.value}</p>
-          </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        {metrics.map((m) => (
+          <Card key={m.label}>
+            <CardContent className="p-3">
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+              <p className="text-base font-bold tabular-nums mt-0.5">{m.value}</p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       <Tabs defaultValue="chart">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="chart">Gráfico</TabsTrigger>
-          <TabsTrigger value="fundamentals">Fundamentos</TabsTrigger>
-          <TabsTrigger value="dividends">Dividendos</TabsTrigger>
-          <TabsTrigger value="preco-justo">Preço Justo</TabsTrigger>
-          <TabsTrigger value="analise">Análise B&amp;H</TabsTrigger>
-          <TabsTrigger value="comparativo">vs IBOV/CDI</TabsTrigger>
-          <TabsTrigger value="se-investisse">Se investisse</TabsTrigger>
+          <TabsTrigger value="dividends">Distribuições</TabsTrigger>
+          <TabsTrigger value="comparativo">vs IBOV / CDI</TabsTrigger>
         </TabsList>
 
         <TabsContent value="chart" className="mt-4">
           <StockChart history={history} ticker={upper} />
         </TabsContent>
 
-        <TabsContent value="fundamentals" className="mt-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {fundamentals.map((f) => (
-              <Card key={f.label}>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground">{f.label}</p>
-                  <p className="text-xl font-bold tabular-nums mt-1">{f.value}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
         <TabsContent value="dividends" className="mt-4">
           <DividendChart dividends={dividends} ticker={upper} />
-        </TabsContent>
-
-        <TabsContent value="preco-justo" className="mt-4">
-          <PrecoJusto
-            price={quote.regularMarketPrice}
-            eps={quote.earningsPerShare}
-            priceToBook={quote.priceToBook}
-            dividendsYield={quote.dividendsYield}
-          />
-        </TabsContent>
-
-        <TabsContent value="analise" className="mt-4">
-          <BHChecklist
-            price={quote.regularMarketPrice}
-            pl={quote.priceEarnings}
-            pvp={quote.priceToBook}
-            dy={quote.dividendsYield}
-            eps={quote.earningsPerShare}
-          />
         </TabsContent>
 
         <TabsContent value="comparativo" className="mt-4">
@@ -149,14 +101,6 @@ export default async function StockDetailPage({ params }: Props) {
             ibovHistory={ibovHistory ?? []}
             selicAnnual={selicAnnual}
             ticker={upper}
-          />
-        </TabsContent>
-
-        <TabsContent value="se-investisse" className="mt-4">
-          <SeInvestisse
-            history={history5y ?? history ?? []}
-            ticker={upper}
-            selicAnnual={selicAnnual}
           />
         </TabsContent>
       </Tabs>
