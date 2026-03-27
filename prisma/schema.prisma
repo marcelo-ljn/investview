@@ -80,12 +80,13 @@ enum InvestorProfile {
 }
 
 enum AssetType {
-  STOCK    // Ação BR
-  FII      // Fundo Imobiliário
-  ETF      // ETF
-  US_STOCK // Ação US
-  CRYPTO   // Criptomoeda
+  STOCK        // Ação BR
+  FII          // Fundo Imobiliário
+  ETF          // ETF
+  US_STOCK     // Ação US
+  CRYPTO       // Criptomoeda
   FIXED_INCOME // Renda Fixa
+  OTHER        // Outros
 }
 
 enum TransactionType {

@@ -38,7 +38,7 @@ export function AllocationChart({ positions, totalValue }: Props) {
     typeMap[p.assetType] = (typeMap[p.assetType] ?? 0) + p.currentValue
   })
   const typeData = Object.entries(typeMap).map(([name, value]) => ({
-    name: name === "STOCK" ? "Ações" : name === "FII" ? "FIIs" : name,
+    name: name === "STOCK" ? "Ações BR" : name === "FII" ? "FIIs" : name === "ETF" ? "ETFs" : name === "US_STOCK" ? "Ações US" : name === "CRYPTO" ? "Cripto" : name === "FIXED_INCOME" ? "Renda Fixa" : name === "OTHER" ? "Outros" : name,
     value,
     weight: (value / totalValue) * 100,
   }))
