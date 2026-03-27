@@ -1,0 +1,452 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Auth (NextAuth) ──────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  bio           String?
+  onboardedAt   DateTime?
+  investorProfile InvestorProfile @default(MODERATE)
+  watchedAssetTypes String[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts   Account[]
+  sessions   Session[]
+  portfolios Portfolio[]
+  watchlist  Watchlist[]
+  alerts     PriceAlert[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum InvestorProfile {
+  CONSERVATIVE
+  MODERATE
+  AGGRESSIVE
+}
+
+enum AssetType {
+  STOCK    // Ação BR
+  FII      // Fundo Imobiliário
+  ETF      // ETF
+  US_STOCK // Ação US
+  CRYPTO   // Criptomoeda
+  FIXED_INCOME // Renda Fixa
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  DIVIDEND
+  JCP        // Juros sobre Capital Próprio
+  AMORTIZATION
+  SUBSCRIPTION
+}
+
+enum FixedIncomeType {
+  TESOURO_SELIC
+  TESOURO_IPCA
+  TESOURO_PREFIXADO
+  CDB
+  LCI
+  LCA
+  LIG
+  CRI
+  CRA
+  DEBENTURE
+  POUPANCA
+}
+
+enum Indexer {
+  CDI
+  SELIC
+  IPCA
+  IGPM
+  PREFIXADO
+  IPCA_PLUS
+  CDI_PLUS
+}
+
+// ─── Stocks / Ações ───────────────────────────────────────────────────────────
+
+model Stock {
+  ticker      String   @id
+  name        String
+  longName    String?
+  sector      String?
+  subSector   String?
+  segment     String?
+  exchange    String   @default("BVMF")
+  currency    String   @default("BRL")
+  logoUrl     String?
+  about       String?  @db.Text
+  website     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  prices       StockPrice[]
+  fundamentals StockFundamentals[]
+  dividends    StockDividend[]
+  watchlist    Watchlist[]   @relation("WatchlistStock")
+  positions    Position[]    @relation("PositionStock")
+
+  @@map("stocks")
+}
+
+model StockPrice {
+  id        String   @id @default(cuid())
+  ticker    String
+  date      DateTime @db.Date
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    BigInt
+  createdAt DateTime @default(now())
+
+  stock Stock @relation(fields: [ticker], references: [ticker], onDelete: Cascade)
+
+  @@unique([ticker, date])
+  @@index([ticker, date])
+  @@map("stock_prices")
+}
+
+model StockFundamentals {
+  id             String   @id @default(cuid())
+  ticker         String
+  date           DateTime @db.Date
+  pl             Float?   // P/L
+  pvp            Float?   // P/VP
+  roe            Float?   // ROE %
+  roic           Float?   // ROIC %
+  rlv            Float?   // Receita Líquida
+  ebitda         Float?
+  ebit           Float?
+  lucroLiquido   Float?
+  dividaLiquida  Float?
+  dividaEbitda   Float?
+  dyTtm          Float?   // Dividend Yield TTM %
+  psr            Float?   // P/Receita
+  evEbitda       Float?
+  evEbit         Float?
+  lpa            Float?   // LPA
+  vpa            Float?   // VPA
+  mrEbit         Float?   // Margem EBIT %
+  mrLucro        Float?   // Margem Líquida %
+  cagr5Anos      Float?
+  createdAt      DateTime @default(now())
+
+  stock Stock @relation(fields: [ticker], references: [ticker], onDelete: Cascade)
+
+  @@unique([ticker, date])
+  @@map("stock_fundamentals")
+}
+
+model StockDividend {
+  id          String   @id @default(cuid())
+  ticker      String
+  type        String   // DIVIDENDO, JCP, RENDIMENTO
+  value       Float
+  exDate      DateTime @db.Date
+  payDate     DateTime? @db.Date
+  createdAt   DateTime @default(now())
+
+  stock Stock @relation(fields: [ticker], references: [ticker], onDelete: Cascade)
+
+  @@unique([ticker, type, exDate])
+  @@index([ticker, exDate])
+  @@map("stock_dividends")
+}
+
+// ─── FIIs ─────────────────────────────────────────────────────────────────────
+
+model FII {
+  ticker        String   @id
+  name          String
+  longName      String?
+  fiiType       String?  // TIJOLO, PAPEL, HIBRIDO, FOF
+  segment       String?  // LAJES, LOGISTICA, SHOPPING, CRI, CRA...
+  manager       String?  // Gestora
+  admin         String?  // Administradora
+  logoUrl       String?
+  about         String?  @db.Text
+  cnpj          String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  prices       FIIPrice[]
+  fundamentals FIIFundamentals[]
+  dividends    FIIDividend[]
+  watchlist    Watchlist[]   @relation("WatchlistFII")
+  positions    Position[]    @relation("PositionFII")
+
+  @@map("fiis")
+}
+
+model FIIPrice {
+  id        String   @id @default(cuid())
+  ticker    String
+  date      DateTime @db.Date
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    BigInt
+  createdAt DateTime @default(now())
+
+  fii FII @relation(fields: [ticker], references: [ticker], onDelete: Cascade)
+
+  @@unique([ticker, date])
+  @@index([ticker, date])
+  @@map("fii_prices")
+}
+
+model FIIFundamentals {
+  id          String   @id @default(cuid())
+  ticker      String
+  date        DateTime @db.Date
+  pvp         Float?
+  dyMes       Float?   // DY mensal %
+  dy12M       Float?   // DY 12 meses %
+  vacancia    Float?   // % vacância
+  abl         Float?   // Área Bruta Locável m²
+  numImoveis  Int?
+  numCotas    BigInt?
+  vlCota      Float?
+  patrimonio  Float?
+  createdAt   DateTime @default(now())
+
+  fii FII @relation(fields: [ticker], references: [ticker], onDelete: Cascade)
+
+  @@unique([ticker, date])
+  @@map("fii_fundamentals")
+}
+
+model FIIDividend {
+  id        String   @id @default(cuid())
+  ticker    String
+  value     Float
+  exDate    DateTime @db.Date
+  payDate   DateTime? @db.Date
+  createdAt DateTime @default(now())
+
+  fii FII @relation(fields: [ticker], references: [ticker], onDelete: Cascade)
+
+  @@unique([ticker, exDate])
+  @@index([ticker, exDate])
+  @@map("fii_dividends")
+}
+
+// ─── Renda Fixa ───────────────────────────────────────────────────────────────
+
+model FixedIncomeAsset {
+  id          String          @id @default(cuid())
+  type        FixedIncomeType
+  name        String
+  issuer      String?
+  indexer     Indexer
+  rate        Float           // taxa (ex: 12.5 para 12.5% ou 110 para 110% CDI)
+  minAmount   Float?
+  maxAmount   Float?
+  maturityDate DateTime?      @db.Date
+  liquidityDays Int?          // dias para liquidez
+  isActive    Boolean         @default(true)
+  source      String?         // fonte dos dados
+  externalId  String?         // ID na fonte
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("fixed_income_assets")
+}
+
+model TreasuryBond {
+  id          String   @id @default(cuid())
+  name        String   // ex: "Tesouro IPCA+ 2035"
+  code        String   @unique // ex: "Tesouro IPCA+ com Juros Semestrais 2035"
+  type        String   // SELIC, IPCA, PREFIXADO, IPCA_JUROS, PREFIXADO_JUROS
+  expiryDate  DateTime @db.Date
+  buyRate     Float    // taxa compra
+  sellRate    Float    // taxa venda
+  buyPrice    Float    // PU compra
+  sellPrice   Float    // PU venda
+  minAmount   Float
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@map("treasury_bonds")
+}
+
+model EconomicRate {
+  id        String   @id @default(cuid())
+  name      String   // CDI, SELIC, IPCA, IGPM
+  value     Float    // valor atual (%)
+  date      DateTime @db.Date
+  source    String   // BCB, IBGE...
+  createdAt DateTime @default(now())
+
+  @@unique([name, date])
+  @@index([name, date])
+  @@map("economic_rates")
+}
+
+// ─── Portfolio ────────────────────────────────────────────────────────────────
+
+model Portfolio {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  color       String   @default("#3B82F6")
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  positions    Position[]
+  transactions Transaction[]
+  snapshots    PortfolioSnapshot[]
+
+  @@map("portfolios")
+}
+
+model Position {
+  id            String    @id @default(cuid())
+  portfolioId   String
+  ticker        String
+  assetType     AssetType
+  quantity      Float
+  averagePrice  Float
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  stock     Stock?    @relation("PositionStock", fields: [ticker], references: [ticker], map: "positions_stock_ticker_fkey")
+  fii       FII?      @relation("PositionFII", fields: [ticker], references: [ticker], map: "positions_fii_ticker_fkey")
+
+  @@unique([portfolioId, ticker])
+  @@map("positions")
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  portfolioId String
+  ticker      String
+  assetType   AssetType
+  type        TransactionType
+  date        DateTime        @db.Date
+  quantity    Float
+  price       Float
+  fees        Float           @default(0)
+  notes       String?
+  createdAt   DateTime        @default(now())
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, ticker])
+  @@index([portfolioId, date])
+  @@map("transactions")
+}
+
+model PortfolioSnapshot {
+  id          String   @id @default(cuid())
+  portfolioId String
+  date        DateTime @db.Date
+  totalValue  Float
+  totalCost   Float
+  createdAt   DateTime @default(now())
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, date])
+  @@map("portfolio_snapshots")
+}
+
+// ─── Watchlist & Alerts ───────────────────────────────────────────────────────
+
+model Watchlist {
+  id        String    @id @default(cuid())
+  userId    String
+  ticker    String
+  assetType AssetType
+  notes     String?
+  createdAt DateTime  @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stock Stock? @relation("WatchlistStock", fields: [ticker], references: [ticker], map: "watchlist_stock_ticker_fkey")
+  fii   FII?   @relation("WatchlistFII", fields: [ticker], references: [ticker], map: "watchlist_fii_ticker_fkey")
+
+  @@unique([userId, ticker])
+  @@map("watchlist")
+}
+
+model PriceAlert {
+  id         String   @id @default(cuid())
+  userId     String
+  ticker     String
+  assetType  AssetType
+  condition  String   // ABOVE, BELOW
+  targetPrice Float
+  triggered  Boolean  @default(false)
+  triggeredAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("price_alerts")
+}

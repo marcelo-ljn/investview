@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-rates",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-tesouro",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}
