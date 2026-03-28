@@ -6,14 +6,14 @@ import { TrendingUp, BarChart3, Building2, Banknote, Globe, Bitcoin, Briefcase, 
 import { useState } from "react"
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/portfolio", label: "Minha Carteira", icon: Briefcase },
+  { href: "/dashboard", label: "Mercado", icon: LayoutDashboard },
   { href: "/acoes", label: "Ações", icon: TrendingUp },
   { href: "/fiis", label: "FIIs", icon: Building2 },
   { href: "/renda-fixa", label: "Renda Fixa", icon: Banknote },
   { href: "/etfs", label: "ETFs", icon: BarChart3 },
   { href: "/cripto", label: "Cripto", icon: Bitcoin },
   { href: "/dividendos", label: "Dividendos", icon: CalendarDays },
-  { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/simulador", label: "Simulador FIRE", icon: Flame },
   { href: "/comparador", label: "Comparador", icon: Globe },
   { href: "/screener", label: "Screener", icon: SlidersHorizontal },
