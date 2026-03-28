@@ -231,7 +231,9 @@ export function PortfolioTabs({
                             <td className="p-4 text-right tabular-nums text-xs">
                               {isMarket ? p.quantity.toFixed(p.quantity % 1 === 0 ? 0 : 3) : "—"}
                             </td>
-                            <td className="p-4 text-right tabular-nums text-xs">{formatCurrency(p.averagePrice)}</td>
+                            <td className="p-4 text-right tabular-nums text-xs">
+                              {isMarket ? formatCurrency(p.averagePrice) : <span className="text-muted-foreground text-xs">Saldo atual</span>}
+                            </td>
                             <td className="p-4 text-right tabular-nums text-xs font-medium">
                               {isMarket ? formatCurrency(p.currentPrice) : "—"}
                             </td>
