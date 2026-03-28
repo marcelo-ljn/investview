@@ -12,6 +12,7 @@ const txSchema = z.object({
   quantity: z.number().positive(),
   price: z.number().positive(),
   fees: z.number().min(0).default(0),
+  costOverride: z.number().positive().optional(),
   notes: z.string().optional(),
 })
 
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       quantity: tx.quantity,
       price: tx.price,
       fees: tx.fees,
+      costOverride: tx.costOverride,
       notes: tx.notes,
     })),
     skipDuplicates: false,

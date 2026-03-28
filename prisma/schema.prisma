@@ -395,9 +395,10 @@ model Transaction {
   date        DateTime        @db.Date
   quantity    Float
   price       Float
-  fees        Float           @default(0)
-  notes       String?
-  createdAt   DateTime        @default(now())
+  fees         Float           @default(0)
+  costOverride Float?          // FIXED_INCOME/OTHER: custo original separado do saldo (amount)
+  notes        String?
+  createdAt    DateTime        @default(now())
 
   portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
 

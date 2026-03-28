@@ -12,6 +12,7 @@ const transactionSchema = z.object({
   quantity: z.number().positive(),
   price: z.number().positive(),
   fees: z.number().min(0).default(0),
+  costOverride: z.number().positive().optional(),
   notes: z.string().optional(),
 })
 
@@ -61,6 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       quantity: data.quantity,
       price: data.price,
       fees: data.fees,
+      costOverride: data.costOverride,
       notes: data.notes,
     },
   })

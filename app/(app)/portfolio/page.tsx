@@ -75,13 +75,13 @@ export default async function PortfolioPage() {
       const isValueBased = VALUE_BASED_TYPES.includes(p.assetType)
       const quote = isMarket ? quoteMap.get(p.ticker) : undefined
 
-      // Value-based (FIXED_INCOME/OTHER): qty = BRL balance, avgPrice = 1
-      // totalCost = currentValue = qty (the stored BRL balance)
+      // Value-based (FIXED_INCOME/OTHER): qty = BRL balance (saldo), avgPrice = BRL cost basis (custo)
+      // currentValue = saldo, totalCost = custo, gain = saldo - custo (interest earned)
       const currentValue = isValueBased ? p.quantity : p.quantity * (quote?.regularMarketPrice ?? p.averagePrice)
-      const totalCost = isValueBased ? p.quantity : p.quantity * p.averagePrice
+      const totalCost = isValueBased ? p.averagePrice : p.quantity * p.averagePrice
       const currentPrice = isValueBased ? p.quantity : (quote?.regularMarketPrice ?? p.averagePrice)
-      const gain = isValueBased ? 0 : currentValue - totalCost
-      const gainPercent = isValueBased ? 0 : (totalCost > 0 ? (gain / totalCost) * 100 : 0)
+      const gain = currentValue - totalCost
+      const gainPercent = totalCost > 0 ? (gain / totalCost) * 100 : 0
 
       return {
         ticker: p.ticker, assetType: p.assetType, quantity: p.quantity,
@@ -132,6 +132,7 @@ export default async function PortfolioPage() {
     quantity: t.quantity,
     price: t.price,
     fees: t.fees,
+    costOverride: t.costOverride,
     notes: t.notes,
   }))
 

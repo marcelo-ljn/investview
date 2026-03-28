@@ -190,8 +190,8 @@ export function PortfolioTabs({
                       <tr className="border-b border-border">
                         <th className="text-left p-4 font-medium text-muted-foreground">Ativo</th>
                         <th className="text-right p-4 font-medium text-muted-foreground">Qtd.</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground">P. Médio</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground">Cotação</th>
+                        <th className="text-right p-4 font-medium text-muted-foreground">P. Médio / Custo</th>
+                        <th className="text-right p-4 font-medium text-muted-foreground">Cotação / Saldo</th>
                         <th className="text-right p-4 font-medium text-muted-foreground">Hoje</th>
                         <th className="text-right p-4 font-medium text-muted-foreground hidden md:table-cell">Valor</th>
                         <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">Resultado</th>
@@ -232,10 +232,12 @@ export function PortfolioTabs({
                               {isMarket ? p.quantity.toFixed(p.quantity % 1 === 0 ? 0 : 3) : "—"}
                             </td>
                             <td className="p-4 text-right tabular-nums text-xs">
-                              {isMarket ? formatCurrency(p.averagePrice) : <span className="text-muted-foreground text-xs">Saldo atual</span>}
+                              {isMarket
+                                ? formatCurrency(p.averagePrice)
+                                : <span className="tabular-nums">{formatCurrency(p.averagePrice)}</span>}
                             </td>
                             <td className="p-4 text-right tabular-nums text-xs font-medium">
-                              {isMarket ? formatCurrency(p.currentPrice) : "—"}
+                              {isMarket ? formatCurrency(p.currentPrice) : <span className="tabular-nums">{formatCurrency(p.currentValue)}</span>}
                             </td>
                             <td className="p-4 text-right">
                               {isMarket ? <VariationBadge value={p.changePercent} size="sm" /> : <span className="text-xs text-muted-foreground">—</span>}
@@ -245,7 +247,7 @@ export function PortfolioTabs({
                               {p.gain !== 0 ? `${p.gain >= 0 ? "+" : ""}${formatCurrency(p.gain)}` : "—"}
                             </td>
                             <td className="p-4 text-right hidden lg:table-cell">
-                              {isMarket ? <VariationBadge value={p.gainPercent} size="sm" /> : <span className="text-xs text-muted-foreground">—</span>}
+                              {p.gainPercent !== 0 ? <VariationBadge value={p.gainPercent} size="sm" /> : <span className="text-xs text-muted-foreground">—</span>}
                             </td>
                             <td className="p-4 text-right tabular-nums text-xs text-muted-foreground hidden lg:table-cell">
                               {p.weight.toFixed(1)}%
