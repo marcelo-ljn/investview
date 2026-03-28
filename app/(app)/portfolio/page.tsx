@@ -12,6 +12,7 @@ import type { Metadata } from "next"
 export const metadata: Metadata = { title: "Minha Carteira — InvestView" }
 
 const MARKET_TYPES = ["STOCK", "FII", "ETF", "US_STOCK", "CRYPTO"]
+const QUOTABLE_TYPES = ["STOCK", "FII", "ETF", "US_STOCK"] // CRYPTO não suportado pelo plano brapi
 
 export default async function PortfolioPage() {
   const session = await auth()
@@ -62,7 +63,7 @@ export default async function PortfolioPage() {
 
   if (!isEmpty) {
     const marketTickers = portfolio.positions
-      .filter(p => MARKET_TYPES.includes(p.assetType))
+      .filter(p => QUOTABLE_TYPES.includes(p.assetType))
       .map(p => p.ticker)
 
     const quotes = marketTickers.length > 0 ? await fetchMultipleQuotes(marketTickers) : []
