@@ -63,3 +63,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     summary: { totalValue, totalCost, totalGain, totalGainPercent },
   })
 }
+
+// DELETE: wipe all transactions and positions (full reset)
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { id } = await params
+  const portfolio = await prisma.portfolio.findFirst({ where: { id, userId: session.user.id } })
+  if (!portfolio) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+  await prisma.transaction.deleteMany({ where: { portfolioId: id } })
+  await prisma.position.deleteMany({ where: { portfolioId: id } })
+  await prisma.portfolioSnapshot.deleteMany({ where: { portfolioId: id } })
+
+  return NextResponse.json({ ok: true })
+}

@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatCurrency } from "@/lib/utils"
-import { Search, TrendingUp, TrendingDown, DollarSign, RotateCcw } from "lucide-react"
+import { Search, TrendingUp, TrendingDown, DollarSign, RotateCcw, Trash2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Transaction {
@@ -49,28 +49,53 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
   const [typeFilter, setTypeFilter] = useState("ALL")
   const [assetFilter, setAssetFilter] = useState("ALL")
   const [rebuilding, setRebuilding] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [resetting, setResetting] = useState(false)
+  const [localTxs, setLocalTxs] = useState(transactions)
 
   const filtered = useMemo(() => {
-    return transactions.filter(tx => {
+    return localTxs.filter(tx => {
       const matchSearch = search === "" || tx.ticker.toLowerCase().includes(search.toLowerCase())
       const matchType = typeFilter === "ALL" || tx.type === typeFilter
       const matchAsset = assetFilter === "ALL" || tx.assetType === assetFilter
       return matchSearch && matchType && matchAsset
     })
-  }, [transactions, search, typeFilter, assetFilter])
+  }, [localTxs, search, typeFilter, assetFilter])
 
   async function handleRebuild() {
     if (!confirm("Isso vai recalcular todas as posições a partir do histórico de transações. Confirmar?")) return
     setRebuilding(true)
     try {
       const res = await fetch(`/api/portfolio/${portfolioId}/positions/rebuild`, { method: "POST" })
+      if (res.ok) window.location.reload()
+    } finally {
+      setRebuilding(false)
+    }
+  }
+
+  async function handleDelete(txId: string) {
+    if (!confirm("Excluir este lançamento? As posições serão recalculadas automaticamente.")) return
+    setDeletingId(txId)
+    try {
+      const res = await fetch(`/api/portfolio/${portfolioId}/transactions/${txId}`, { method: "DELETE" })
       if (res.ok) {
-        const data = await res.json()
-        alert(`Posições reconstruídas: ${data.positionsRebult} ativo(s) a partir de ${data.transactionsReplayed} transação(ões).`)
+        setLocalTxs(prev => prev.filter(t => t.id !== txId))
         window.location.reload()
       }
     } finally {
-      setRebuilding(false)
+      setDeletingId(null)
+    }
+  }
+
+  async function handleResetAll() {
+    if (!confirm("⚠️ ATENÇÃO: isso vai apagar TODOS os lançamentos e posições da carteira. Esta ação não pode ser desfeita. Confirmar?")) return
+    if (!confirm("Tem certeza? Todos os dados serão perdidos.")) return
+    setResetting(true)
+    try {
+      const res = await fetch(`/api/portfolio/${portfolioId}/positions`, { method: "DELETE" })
+      if (res.ok) window.location.reload()
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -108,10 +133,16 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={handleRebuild} disabled={rebuilding} className="gap-2 ml-auto">
-          <RotateCcw className={`h-3.5 w-3.5 ${rebuilding ? "animate-spin" : ""}`} />
-          Recalcular posições
-        </Button>
+        <div className="flex gap-2 ml-auto">
+          <Button variant="outline" size="sm" onClick={handleRebuild} disabled={rebuilding} className="gap-2">
+            <RotateCcw className={`h-3.5 w-3.5 ${rebuilding ? "animate-spin" : ""}`} />
+            Recalcular
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleResetAll} disabled={resetting} className="gap-2 text-rose-500 hover:text-rose-500 hover:bg-rose-500/10">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Zerar tudo
+          </Button>
+        </div>
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -132,6 +163,7 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
                 <th className="text-right p-3 font-medium text-muted-foreground hidden md:table-cell">Preço unit.</th>
                 <th className="text-right p-3 font-medium text-muted-foreground">Total</th>
                 <th className="text-right p-3 font-medium text-muted-foreground hidden lg:table-cell">Taxas</th>
+                <th className="w-10" />
               </tr>
             </thead>
             <tbody>
@@ -179,6 +211,16 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
                     <td className="p-3 text-right tabular-nums text-xs text-muted-foreground hidden lg:table-cell">
                       {tx.fees > 0 ? formatCurrency(tx.fees) : "—"}
                     </td>
+                    <td className="p-2 text-right">
+                      <button
+                        onClick={() => handleDelete(tx.id)}
+                        disabled={deletingId === tx.id}
+                        className="p-1 rounded hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors disabled:opacity-50"
+                        title="Excluir lançamento"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
@@ -197,6 +239,7 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
                     )}
                   </td>
                   <td className="hidden lg:table-cell" />
+                  <td />
                 </tr>
               </tfoot>
             )}
