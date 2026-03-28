@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { VariationBadge } from "@/components/ui/variation-badge"
 import { formatCurrency, formatPercent, variationColor } from "@/lib/utils"
@@ -9,6 +9,7 @@ import { PerformanceChart } from "./performance-chart"
 import { ProjectionTab } from "./projection-tab"
 import { TransactionsTab } from "./transactions-tab"
 import { TrendingUp, DollarSign, BarChart3, Target, LayoutList, LineChart, TrendingDown } from "lucide-react"
+import { BarChart, Bar, XAxis, YAxis, LabelList, ResponsiveContainer } from "recharts"
 
 interface Position {
   ticker: string; assetType: string; quantity: number; averagePrice: number;
@@ -48,6 +49,60 @@ const TABS = [
   { key: "lancamentos", label: "Lançamentos", icon: LayoutList },
 ]
 
+// ─── Performers card ──────────────────────────────────────────────────────────
+interface PerformerEntry {
+  ticker: string; assetType: string; gain: number; gainPercent: number;
+}
+function PerformersCard({
+  title, titleColor, barColor, performers,
+}: {
+  title: string; titleColor: string; barColor: string; performers: PerformerEntry[];
+}) {
+  const barData = performers.map(p => ({
+    name: p.ticker.length > 14 ? p.ticker.slice(0, 14) + "…" : p.ticker,
+    pct: Math.abs(Number(p.gainPercent.toFixed(2))),
+  }))
+  const chartHeight = Math.max(performers.length * 38, 80)
+  return (
+    <Card>
+      <div className="p-4 border-b border-border">
+        <p className={`text-sm font-medium ${titleColor}`}>{title}</p>
+      </div>
+      <div className="flex flex-col md:flex-row">
+        {/* Left: list */}
+        <div className="flex-1 divide-y divide-border">
+          {performers.map(p => (
+            <div key={`${p.ticker}-${p.assetType}`} className="flex items-start justify-between p-3 gap-3">
+              <div>
+                <p className="text-xs font-semibold">{p.ticker}</p>
+                <p className="text-[10px] text-muted-foreground">{assetBadgeLabel[p.assetType] ?? p.assetType}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className={`text-xs font-semibold tabular-nums ${variationColor(p.gain)}`}>
+                  {p.gain >= 0 ? "+" : ""}{formatCurrency(p.gain)}
+                </p>
+                <VariationBadge value={p.gainPercent} size="sm" />
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Right: bar chart */}
+        <div className="w-full md:w-64 p-3 border-t md:border-t-0 md:border-l border-border flex items-center">
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <BarChart layout="vertical" data={barData} margin={{ top: 0, right: 36, left: 0, bottom: 0 }}>
+              <XAxis type="number" hide domain={[0, "dataMax"]} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} width={76} axisLine={false} tickLine={false} />
+              <Bar dataKey="pct" fill={barColor} radius={[0, 3, 3, 0]} barSize={14}>
+                <LabelList dataKey="pct" position="right" formatter={(v: unknown) => `${Number(v).toFixed(1)}%`} style={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 // ─── Rentabilidade tab ────────────────────────────────────────────────────────
 function RentabilidadeTab({
   snapshots, positions, transactions, summary,
@@ -79,7 +134,7 @@ function RentabilidadeTab({
       <Card>
         <CardContent className="p-5">
           <p className="text-sm font-medium mb-4">Evolução patrimonial</p>
-          <PerformanceChart snapshots={snapshots} />
+          <PerformanceChart snapshots={snapshots} positions={positions} />
         </CardContent>
       </Card>
 
@@ -174,56 +229,21 @@ function RentabilidadeTab({
       </Card>
 
       {/* Top & worst performers */}
-      {(top5.length > 0 || worst5.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {top5.length > 0 && (
-            <Card>
-              <div className="p-4 border-b border-border">
-                <p className="text-sm font-medium text-emerald-500">↑ Melhores desempenhos</p>
-              </div>
-              <div className="divide-y divide-border">
-                {top5.map(p => (
-                  <div key={`${p.ticker}-${p.assetType}`} className="flex items-center justify-between p-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold truncate max-w-[160px]">{p.ticker}</p>
-                      <p className="text-[10px] text-muted-foreground">{assetBadgeLabel[p.assetType] ?? p.assetType}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-xs font-semibold tabular-nums ${variationColor(p.gain)}`}>
-                        {p.gain >= 0 ? "+" : ""}{formatCurrency(p.gain)}
-                      </p>
-                      <VariationBadge value={p.gainPercent} size="sm" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {worst5.length > 0 && (
-            <Card>
-              <div className="p-4 border-b border-border">
-                <p className="text-sm font-medium text-rose-500">↓ Piores desempenhos</p>
-              </div>
-              <div className="divide-y divide-border">
-                {worst5.map(p => (
-                  <div key={`${p.ticker}-${p.assetType}`} className="flex items-center justify-between p-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold truncate max-w-[160px]">{p.ticker}</p>
-                      <p className="text-[10px] text-muted-foreground">{assetBadgeLabel[p.assetType] ?? p.assetType}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-xs font-semibold tabular-nums ${variationColor(p.gain)}`}>
-                        {formatCurrency(p.gain)}
-                      </p>
-                      <VariationBadge value={p.gainPercent} size="sm" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
+      {top5.length > 0 && (
+        <PerformersCard
+          title="↑ Melhores desempenhos"
+          titleColor="text-emerald-500"
+          barColor="#10b981"
+          performers={top5}
+        />
+      )}
+      {worst5.length > 0 && (
+        <PerformersCard
+          title="↓ Piores desempenhos"
+          titleColor="text-rose-500"
+          barColor="#f43f5e"
+          performers={worst5}
+        />
       )}
     </div>
   )
@@ -258,6 +278,15 @@ export function PortfolioTabs({
   portfolio, positions, transactions, snapshots, summary, isEmpty, actions, emptyState
 }: PortfolioTabsProps) {
   const [tab, setTab] = useState("resumo")
+
+  const firstTxDateByType = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const tx of transactions) {
+      const d = typeof tx.date === "string" ? tx.date : (tx.date as Date).toISOString()
+      if (!map[tx.assetType] || d < map[tx.assetType]) map[tx.assetType] = d
+    }
+    return map
+  }, [transactions])
 
   return (
     <div className="space-y-6">
@@ -369,6 +398,7 @@ export function PortfolioTabs({
                     accentColor={cfg.color}
                     positions={lane}
                     totalValue={summary.totalValue}
+                    firstTxDate={firstTxDateByType[cfg.type]}
                   />
                 )
               })}

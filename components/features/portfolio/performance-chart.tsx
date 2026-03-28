@@ -9,13 +9,18 @@ interface Snapshot {
   totalCost: number
 }
 
-interface PerformanceChartProps {
-  snapshots: Snapshot[]
+interface Position {
+  totalCost: number
+  currentValue: number
 }
 
-export function PerformanceChart({ snapshots }: PerformanceChartProps) {
-  const data = useMemo(() => {
-    if (snapshots.length === 0) return []
+interface PerformanceChartProps {
+  snapshots: Snapshot[]
+  positions?: Position[]
+}
+
+export function PerformanceChart({ snapshots, positions = [] }: PerformanceChartProps) {
+  const snapshotData = useMemo(() => {
     return snapshots.map(s => ({
       date: new Date(s.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
       patrimonio: Number(s.totalValue.toFixed(2)),
@@ -23,10 +28,23 @@ export function PerformanceChart({ snapshots }: PerformanceChartProps) {
     }))
   }, [snapshots])
 
+  const syntheticData = useMemo(() => {
+    if (positions.length === 0) return []
+    const totalCost  = positions.reduce((s, p) => s + p.totalCost, 0)
+    const totalValue = positions.reduce((s, p) => s + p.currentValue, 0)
+    return [
+      { date: "Início", patrimonio: totalCost,  custo: totalCost },
+      { date: "Hoje",   patrimonio: totalValue, custo: totalCost },
+    ]
+  }, [positions])
+
+  const isSynthetic = snapshotData.length < 2
+  const data = isSynthetic ? syntheticData : snapshotData
+
   if (data.length < 2) {
     return (
       <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-        Histórico de evolução será exibido após o segundo acesso à carteira.
+        Adicione posições para visualizar o gráfico de evolução.
       </div>
     )
   }
@@ -77,23 +95,8 @@ export function PerformanceChart({ snapshots }: PerformanceChartProps) {
             }}
           />
           <ReferenceLine y={firstValue} stroke="var(--color-muted-foreground)" strokeDasharray="3 3" strokeOpacity={0.5} />
-          <Line
-            type="monotone"
-            dataKey="custo"
-            stroke="var(--color-muted-foreground)"
-            strokeDasharray="4 2"
-            strokeWidth={1.5}
-            dot={false}
-            name="Custo"
-          />
-          <Line
-            type="monotone"
-            dataKey="patrimonio"
-            stroke="#3b82f6"
-            strokeWidth={2}
-            dot={false}
-            name="Patrimônio"
-          />
+          <Line type="monotone" dataKey="custo" stroke="var(--color-muted-foreground)" strokeDasharray="4 2" strokeWidth={1.5} dot={false} name="Custo" />
+          <Line type="monotone" dataKey="patrimonio" stroke="#3b82f6" strokeWidth={2} dot={false} name="Patrimônio" />
         </LineChart>
       </ResponsiveContainer>
       <div className="flex gap-4 text-xs text-muted-foreground">
@@ -106,6 +109,11 @@ export function PerformanceChart({ snapshots }: PerformanceChartProps) {
           Custo
         </span>
       </div>
+      {isSynthetic && (
+        <p className="text-[10px] text-muted-foreground">
+          Estimativa baseada em posições atuais. O gráfico real acumula dados a cada acesso à carteira.
+        </p>
+      )}
     </div>
   )
 }

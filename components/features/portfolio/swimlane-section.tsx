@@ -31,11 +31,11 @@ interface Props {
   accentColor: string
   positions: Position[]
   totalValue: number
+  firstTxDate?: string
 }
 
 type Period = "monthly" | "quarterly" | "annual"
 
-// Expected annual rates by asset type (for projection)
 const ANNUAL_RATES: Record<string, number> = {
   FIXED_INCOME: 0.13,
   STOCK:        0.10,
@@ -46,10 +46,100 @@ const ANNUAL_RATES: Record<string, number> = {
   OTHER:        0.00,
 }
 
-const PERIOD_CONFIG: Record<Period, { label: string; steps: string[]; factor: number }> = {
-  monthly:   { label: "Mensal",     steps: ["Hoje", "+1 mês", "+2 meses", "+3 meses"],    factor: 1 / 12 },
-  quarterly: { label: "Trimestral", steps: ["Hoje", "+3 meses", "+6 meses", "+9 meses"],  factor: 3 / 12 },
-  annual:    { label: "Anual",      steps: ["Hoje", "+1 ano", "+2 anos", "+3 anos"],       factor: 1 },
+// Date helpers (no external lib)
+function subMonths(d: Date, n: number): Date {
+  const r = new Date(d)
+  r.setMonth(r.getMonth() - n)
+  return r
+}
+function fmtMonthYear(d: Date): string {
+  return d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })
+}
+function fmtQuarter(d: Date): string {
+  return `Q${Math.ceil((d.getMonth() + 1) / 3)}/${d.getFullYear().toString().slice(2)}`
+}
+
+interface PeriodCfg {
+  label: string
+  factor: number
+  msPerPeriod: number
+  todayLabel: (d: Date) => string
+  pastLabel: (today: Date, i: number) => string
+  futureLabel: (i: number) => string
+}
+
+const PERIOD_CONFIG: Record<Period, PeriodCfg> = {
+  monthly: {
+    label: "Mensal",
+    factor: 1 / 12,
+    msPerPeriod: (365.25 / 12) * 24 * 60 * 60 * 1000,
+    todayLabel: (d) => fmtMonthYear(d),
+    pastLabel:  (d, i) => fmtMonthYear(subMonths(d, i)),
+    futureLabel: (i) => `+${i} ${i === 1 ? "mês" : "meses"}`,
+  },
+  quarterly: {
+    label: "Trimestral",
+    factor: 3 / 12,
+    msPerPeriod: (365.25 / 4) * 24 * 60 * 60 * 1000,
+    todayLabel: (d) => fmtQuarter(d),
+    pastLabel:  (d, i) => fmtQuarter(subMonths(d, i * 3)),
+    futureLabel: (i) => `+${i * 3}M`,
+  },
+  annual: {
+    label: "Anual",
+    factor: 1,
+    msPerPeriod: 365.25 * 24 * 60 * 60 * 1000,
+    todayLabel: (d) => String(d.getFullYear()),
+    pastLabel:  (d, i) => String(d.getFullYear() - i),
+    futureLabel: (i) => `+${i}A`,
+  },
+}
+
+interface ChartPoint {
+  label: string
+  hist?: number
+  proj?: number
+}
+
+function buildChartData(
+  totalCost: number,
+  totalBalance: number,
+  firstTxDate: string | undefined,
+  period: Period,
+  assetType: string,
+): { points: ChartPoint[]; todayLabel: string } {
+  const cfg = PERIOD_CONFIG[period]
+  const rate = ANNUAL_RATES[assetType] ?? 0
+  const periodRate = rate * cfg.factor
+  const today = new Date()
+  const points: ChartPoint[] = []
+
+  // Historical points (past)
+  if (firstTxDate) {
+    const start = new Date(firstTxDate)
+    const diffMs = today.getTime() - start.getTime()
+    const nPeriods = Math.min(Math.floor(diffMs / cfg.msPerPeriod), 12)
+
+    for (let i = nPeriods; i >= 1; i--) {
+      const ratio = nPeriods > 0 ? (1 - i / nPeriods) : 0
+      const value = Number((totalCost + (totalBalance - totalCost) * ratio).toFixed(2))
+      points.push({ label: cfg.pastLabel(today, i), hist: value })
+    }
+  }
+
+  // Today (junction point — both hist and proj)
+  const todayLabel = cfg.todayLabel(today)
+  points.push({ label: todayLabel, hist: totalBalance, proj: totalBalance })
+
+  // Future projection (3 periods)
+  for (let i = 1; i <= 3; i++) {
+    points.push({
+      label: cfg.futureLabel(i),
+      proj: Number((totalBalance * Math.pow(1 + periodRate, i)).toFixed(2)),
+    })
+  }
+
+  return { points, todayLabel }
 }
 
 const VALUE_BASED = ["FIXED_INCOME", "OTHER"]
@@ -68,7 +158,7 @@ const assetBadgeLabel: Record<string, string> = {
   CRYPTO: "Cripto", FIXED_INCOME: "RF", OTHER: "Outro",
 }
 
-export function SwimlaneSection({ assetType, label, icon, accentColor, positions, totalValue }: Props) {
+export function SwimlaneSection({ assetType, label, icon, accentColor, positions, totalValue, firstTxDate }: Props) {
   const [period, setPeriod] = useState<Period>("monthly")
   const [collapsed, setCollapsed] = useState(false)
 
@@ -80,19 +170,12 @@ export function SwimlaneSection({ assetType, label, icon, accentColor, positions
   const isValueBased = VALUE_BASED.includes(assetType)
   const isMarket = !isValueBased
 
-  // Projection chart data
-  const chartData = useMemo(() => {
-    const cfg = PERIOD_CONFIG[period]
-    const rate = ANNUAL_RATES[assetType] ?? 0
-    const periodRate = rate * cfg.factor
-    return cfg.steps.map((step, i) => ({
-      label: step,
-      value: Number((totalBalance * Math.pow(1 + periodRate, i)).toFixed(2)),
-      projected: i > 0,
-    }))
-  }, [period, assetType, totalBalance])
+  const { points: chartData, todayLabel } = useMemo(
+    () => buildChartData(totalCost, totalBalance, firstTxDate, period, assetType),
+    [period, assetType, totalBalance, totalCost, firstTxDate],
+  )
 
-  const showProjection = totalBalance > 0 && (ANNUAL_RATES[assetType] ?? 0) > 0
+  const showChart = totalBalance > 0 && (ANNUAL_RATES[assetType] ?? 0) > 0
 
   return (
     <Card className="overflow-hidden">
@@ -132,11 +215,11 @@ export function SwimlaneSection({ assetType, label, icon, accentColor, positions
 
       {!collapsed && (
         <>
-          {/* Mini projection chart */}
-          {showProjection && (
+          {/* Chart: histórico + Hoje + projeção */}
+          {showChart && (
             <div className="px-4 pb-4 border-t border-border pt-4">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-muted-foreground">Projeção estimada</p>
+                <p className="text-xs text-muted-foreground">Histórico e projeção estimada</p>
                 <div className="flex gap-1">
                   {(["monthly", "quarterly", "annual"] as Period[]).map(p => (
                     <button
@@ -151,11 +234,15 @@ export function SwimlaneSection({ assetType, label, icon, accentColor, positions
                   ))}
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={120}>
-                <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={130}>
+                <AreaChart data={chartData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id={`grad-${assetType}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={accentColor} stopOpacity={0.3} />
+                    <linearGradient id={`grad-hist-${assetType}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={accentColor} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={accentColor} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id={`grad-proj-${assetType}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={accentColor} stopOpacity={0.15} />
                       <stop offset="95%" stopColor={accentColor} stopOpacity={0} />
                     </linearGradient>
                   </defs>
@@ -181,19 +268,41 @@ export function SwimlaneSection({ assetType, label, icon, accentColor, positions
                       fontSize: 11,
                     }}
                   />
-                  <ReferenceLine x="Hoje" stroke={accentColor} strokeDasharray="4 2" strokeOpacity={0.7} />
+                  <ReferenceLine
+                    x={todayLabel}
+                    stroke="#6b7280"
+                    strokeDasharray="4 2"
+                    strokeOpacity={0.8}
+                    label={{ value: "Hoje", position: "insideTopRight", fontSize: 9, fill: "#6b7280" }}
+                  />
+                  {/* Historical area (solid) */}
                   <Area
                     type="monotone"
-                    dataKey="value"
+                    dataKey="hist"
                     stroke={accentColor}
                     strokeWidth={2}
-                    fill={`url(#grad-${assetType})`}
-                    dot={{ fill: accentColor, r: 3 }}
+                    fill={`url(#grad-hist-${assetType})`}
+                    dot={false}
+                    activeDot={{ r: 3, fill: accentColor }}
+                    connectNulls={false}
+                  />
+                  {/* Projection area (dashed, lighter) */}
+                  <Area
+                    type="monotone"
+                    dataKey="proj"
+                    stroke={accentColor}
+                    strokeWidth={1.5}
+                    strokeDasharray="5 3"
+                    strokeOpacity={0.6}
+                    fill={`url(#grad-proj-${assetType})`}
+                    dot={false}
+                    activeDot={{ r: 3, fill: accentColor }}
+                    connectNulls={false}
                   />
                 </AreaChart>
               </ResponsiveContainer>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Taxa estimada: {((ANNUAL_RATES[assetType] ?? 0) * 100).toFixed(0)}% a.a. — apenas referência, não é garantia de rendimento.
+                Taxa projetada: {((ANNUAL_RATES[assetType] ?? 0) * 100).toFixed(0)}% a.a. — apenas referência, não é garantia de rendimento.
               </p>
             </div>
           )}
