@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
 const transactionSchema = z.object({
-  ticker: z.string().min(1).max(10).toUpperCase(),
-  assetType: z.enum(["STOCK", "FII", "ETF", "US_STOCK", "CRYPTO", "FIXED_INCOME"]),
+  ticker: z.string().min(1).max(200).transform(v => v.trim()),
+  assetType: z.enum(["STOCK", "FII", "ETF", "US_STOCK", "CRYPTO", "FIXED_INCOME", "OTHER"]),
   type: z.enum(["BUY", "SELL", "DIVIDEND", "JCP", "AMORTIZATION", "SUBSCRIPTION"]),
   date: z.string(),
   quantity: z.number().positive(),
