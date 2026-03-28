@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { applyTransactionToPosition } from "@/lib/portfolio-position"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -20,44 +21,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     orderBy: { date: "asc" },
   })
 
-  // 3. Replay each BUY/SELL to rebuild positions
+  // 3. Replay each BUY/SELL using the shared position logic
   for (const tx of transactions) {
-    if (tx.type !== "BUY" && tx.type !== "SELL") continue
-
-    const existing = await prisma.position.findFirst({
-      where: { portfolioId: id, ticker: tx.ticker },
-    })
-
-    if (tx.type === "BUY") {
-      if (existing) {
-        const newQty = existing.quantity + tx.quantity
-        const newAvg = (existing.quantity * existing.averagePrice + tx.quantity * tx.price) / newQty
-        await prisma.position.update({
-          where: { id: existing.id },
-          data: { quantity: newQty, averagePrice: newAvg },
-        })
-      } else {
-        await prisma.position.create({
-          data: {
-            portfolioId: id,
-            ticker: tx.ticker,
-            assetType: tx.assetType,
-            quantity: tx.quantity,
-            averagePrice: tx.price,
-          },
-        })
-      }
-    } else if (tx.type === "SELL" && existing) {
-      const newQty = existing.quantity - tx.quantity
-      if (newQty <= 0.0001) {
-        await prisma.position.delete({ where: { id: existing.id } })
-      } else {
-        await prisma.position.update({
-          where: { id: existing.id },
-          data: { quantity: newQty },
-        })
-      }
-    }
+    await applyTransactionToPosition(id, tx)
   }
 
   const positions = await prisma.position.findMany({ where: { portfolioId: id } })
@@ -65,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({
     message: "Positions rebuilt from transaction history",
     transactionsReplayed: transactions.filter(t => t.type === "BUY" || t.type === "SELL").length,
-    positionsRebult: positions.length,
+    positionsRebuilt: positions.length,
     positions: positions.map(p => ({
       ticker: p.ticker,
       assetType: p.assetType,

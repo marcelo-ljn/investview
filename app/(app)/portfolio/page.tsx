@@ -68,14 +68,21 @@ export default async function PortfolioPage() {
     const quotes = marketTickers.length > 0 ? await fetchMultipleQuotes(marketTickers) : []
     const quoteMap = new Map(quotes.map(q => [q.symbol, q]))
 
+    const VALUE_BASED_TYPES = ["FIXED_INCOME", "OTHER"]
+
     positions = portfolio.positions.map(p => {
       const isMarket = MARKET_TYPES.includes(p.assetType)
+      const isValueBased = VALUE_BASED_TYPES.includes(p.assetType)
       const quote = isMarket ? quoteMap.get(p.ticker) : undefined
-      const currentPrice = isMarket ? (quote?.regularMarketPrice ?? p.averagePrice) : p.averagePrice
-      const totalCost = p.quantity * p.averagePrice
-      const currentValue = p.quantity * currentPrice
-      const gain = currentValue - totalCost
-      const gainPercent = totalCost > 0 ? (gain / totalCost) * 100 : 0
+
+      // Value-based (FIXED_INCOME/OTHER): qty = BRL balance, avgPrice = 1
+      // totalCost = currentValue = qty (the stored BRL balance)
+      const currentValue = isValueBased ? p.quantity : p.quantity * (quote?.regularMarketPrice ?? p.averagePrice)
+      const totalCost = isValueBased ? p.quantity : p.quantity * p.averagePrice
+      const currentPrice = isValueBased ? p.quantity : (quote?.regularMarketPrice ?? p.averagePrice)
+      const gain = isValueBased ? 0 : currentValue - totalCost
+      const gainPercent = isValueBased ? 0 : (totalCost > 0 ? (gain / totalCost) * 100 : 0)
+
       return {
         ticker: p.ticker, assetType: p.assetType, quantity: p.quantity,
         averagePrice: p.averagePrice, currentPrice, totalCost, currentValue,

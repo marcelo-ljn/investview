@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { applyTransactionToPosition } from "@/lib/portfolio-position"
 import { z } from "zod"
 
 const txSchema = z.object({
@@ -19,40 +20,6 @@ const batchSchema = z.object({
   rebuildPositions: z.boolean().default(true),
 })
 
-// Helper: recalc position from a single transaction (same logic as single POST)
-async function applyTransaction(
-  portfolioId: string,
-  tx: z.infer<typeof txSchema>
-) {
-  if (tx.type !== "BUY" && tx.type !== "SELL") return
-
-  const ticker = tx.ticker
-  const existing = await prisma.position.findFirst({
-    where: { portfolioId, ticker },
-  })
-
-  if (tx.type === "BUY") {
-    if (existing) {
-      const newQty = existing.quantity + tx.quantity
-      const newAvg = (existing.quantity * existing.averagePrice + tx.quantity * tx.price) / newQty
-      await prisma.position.update({
-        where: { id: existing.id },
-        data: { quantity: newQty, averagePrice: newAvg },
-      })
-    } else {
-      await prisma.position.create({
-        data: { portfolioId, ticker, assetType: tx.assetType, quantity: tx.quantity, averagePrice: tx.price },
-      })
-    }
-  } else if (tx.type === "SELL" && existing) {
-    const newQty = existing.quantity - tx.quantity
-    if (newQty <= 0.0001) {
-      await prisma.position.delete({ where: { id: existing.id } })
-    } else {
-      await prisma.position.update({ where: { id: existing.id }, data: { quantity: newQty } })
-    }
-  }
-}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -100,21 +67,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       orderBy: { date: "asc" },
     })
     for (const tx of allTx) {
-      await applyTransaction(id, {
-        ticker: tx.ticker,
-        assetType: tx.assetType as z.infer<typeof txSchema>["assetType"],
-        type: tx.type as z.infer<typeof txSchema>["type"],
-        date: tx.date.toISOString(),
-        quantity: tx.quantity,
-        price: tx.price,
-        fees: tx.fees,
-        notes: tx.notes ?? undefined,
-      })
+      await applyTransactionToPosition(id, tx)
     }
   } else {
-    // Just apply the new transactions sequentially
     for (const tx of sorted) {
-      await applyTransaction(id, tx)
+      await applyTransactionToPosition(id, tx)
     }
   }
 

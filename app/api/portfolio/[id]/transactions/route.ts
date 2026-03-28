@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { applyTransactionToPosition } from "@/lib/portfolio-position"
 import { z } from "zod"
 
 const transactionSchema = z.object({
@@ -65,44 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   })
 
   // Update position
-  if (data.type === "BUY" || data.type === "SELL") {
-    const existing = await prisma.position.findUnique({
-      where: { portfolioId_ticker: { portfolioId: id, ticker: data.ticker } },
-    })
-
-    if (data.type === "BUY") {
-      if (existing) {
-        const newQty = existing.quantity + data.quantity
-        const newAvg = (existing.quantity * existing.averagePrice + data.quantity * data.price) / newQty
-        await prisma.position.update({
-          where: { portfolioId_ticker: { portfolioId: id, ticker: data.ticker } },
-          data: { quantity: newQty, averagePrice: newAvg },
-        })
-      } else {
-        await prisma.position.create({
-          data: {
-            portfolioId: id,
-            ticker: data.ticker,
-            assetType: data.assetType,
-            quantity: data.quantity,
-            averagePrice: data.price,
-          },
-        })
-      }
-    } else if (data.type === "SELL" && existing) {
-      const newQty = existing.quantity - data.quantity
-      if (newQty <= 0) {
-        await prisma.position.delete({
-          where: { portfolioId_ticker: { portfolioId: id, ticker: data.ticker } },
-        })
-      } else {
-        await prisma.position.update({
-          where: { portfolioId_ticker: { portfolioId: id, ticker: data.ticker } },
-          data: { quantity: newQty },
-        })
-      }
-    }
-  }
+  await applyTransactionToPosition(id, data)
 
   return NextResponse.json({ transaction }, { status: 201 })
 }
