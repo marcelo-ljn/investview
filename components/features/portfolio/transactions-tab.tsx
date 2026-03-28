@@ -127,11 +127,19 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
   }
 
   async function handleResetAll() {
-    if (!confirm("⚠️ ATENÇÃO: isso vai apagar TODOS os lançamentos e posições da carteira. Esta ação não pode ser desfeita. Confirmar?")) return
-    if (!confirm("Tem certeza? Todos os dados serão perdidos.")) return
+    const isFiltered = assetFilter !== "ALL"
+    const filterLabel = isFiltered ? (ASSET_LABELS[assetFilter] ?? assetFilter) : null
+    const confirmMsg = isFiltered
+      ? `⚠️ Isso vai apagar TODOS os lançamentos de "${filterLabel}" e recalcular as posições. Confirmar?`
+      : "⚠️ ATENÇÃO: isso vai apagar TODOS os lançamentos e posições da carteira. Esta ação não pode ser desfeita. Confirmar?"
+    if (!confirm(confirmMsg)) return
+    if (!isFiltered && !confirm("Tem certeza? Todos os dados serão perdidos.")) return
     setResetting(true)
     try {
-      const res = await fetch(`/api/portfolio/${portfolioId}/positions`, { method: "DELETE" })
+      const url = isFiltered
+        ? `/api/portfolio/${portfolioId}/positions?assetType=${assetFilter}`
+        : `/api/portfolio/${portfolioId}/positions`
+      const res = await fetch(url, { method: "DELETE" })
       if (res.ok) window.location.reload()
     } finally {
       setResetting(false)
@@ -179,7 +187,7 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
           </Button>
           <Button variant="outline" size="sm" onClick={handleResetAll} disabled={resetting} className="gap-2 text-rose-500 hover:text-rose-500 hover:bg-rose-500/10">
             <AlertTriangle className="h-3.5 w-3.5" />
-            Zerar tudo
+            {assetFilter !== "ALL" ? `Zerar ${ASSET_LABELS[assetFilter] ?? assetFilter}` : "Zerar tudo"}
           </Button>
         </div>
       </div>

@@ -3,14 +3,12 @@ import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { VariationBadge } from "@/components/ui/variation-badge"
 import { formatCurrency, formatPercent, variationColor } from "@/lib/utils"
-import { AllocationChart } from "./allocation-chart"
-import { DividendProjection } from "./dividend-projection"
+import { TypeAllocationBar } from "./type-allocation-bar"
+import { SwimlaneSection } from "./swimlane-section"
 import { PerformanceChart } from "./performance-chart"
 import { ProjectionTab } from "./projection-tab"
 import { TransactionsTab } from "./transactions-tab"
 import { TrendingUp, DollarSign, BarChart3, Target, LayoutList, LineChart, TrendingDown } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
 
 interface Position {
   ticker: string; assetType: string; quantity: number; averagePrice: number;
@@ -48,6 +46,197 @@ const TABS = [
   { key: "rentabilidade", label: "Rentabilidade", icon: LineChart },
   { key: "projecao", label: "Projeção", icon: TrendingUp },
   { key: "lancamentos", label: "Lançamentos", icon: LayoutList },
+]
+
+// ─── Rentabilidade tab ────────────────────────────────────────────────────────
+function RentabilidadeTab({
+  snapshots, positions, transactions, summary,
+}: {
+  snapshots: Snapshot[]
+  positions: Position[]
+  transactions: Transaction[]
+  summary: Summary
+}) {
+  // Breakdown by asset type
+  const typeBreakdown = SWIMLANE_ORDER.map(cfg => {
+    const group = positions.filter(p => p.assetType === cfg.type)
+    if (group.length === 0) return null
+    const cost  = group.reduce((s, p) => s + p.totalCost,    0)
+    const value = group.reduce((s, p) => s + p.currentValue, 0)
+    const gain  = value - cost
+    const pct   = cost > 0 ? (gain / cost) * 100 : 0
+    return { ...cfg, cost, value, gain, pct }
+  }).filter(Boolean) as Array<{ type: string; label: string; icon: string; color: string; cost: number; value: number; gain: number; pct: number }>
+
+  // Top & worst performers (only market positions with actual gain data)
+  const sorted = [...positions].filter(p => p.gainPercent !== 0).sort((a, b) => b.gainPercent - a.gainPercent)
+  const top5   = sorted.slice(0, 5)
+  const worst5 = sorted.filter(p => p.gainPercent < 0).slice(-5).reverse()
+
+  return (
+    <div className="space-y-6">
+      {/* Evolution chart */}
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm font-medium mb-4">Evolução patrimonial</p>
+          <PerformanceChart snapshots={snapshots} />
+        </CardContent>
+      </Card>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Rentabilidade total</p>
+            <p className={`text-2xl font-bold ${variationColor(summary.totalGainPercent)}`}>
+              {formatPercent(summary.totalGainPercent)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Resultado em R$</p>
+            <p className={`text-2xl font-bold ${variationColor(summary.totalGain)}`}>
+              {summary.totalGain >= 0 ? "+" : ""}{formatCurrency(summary.totalGain)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="col-span-2 md:col-span-1">
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Lançamentos registrados</p>
+            <p className="text-2xl font-bold">{transactions.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Compras: {transactions.filter(t => t.type === "BUY").length} ·{" "}
+              Vendas: {transactions.filter(t => t.type === "SELL").length} ·{" "}
+              Proventos: {transactions.filter(t => t.type === "DIVIDEND" || t.type === "JCP").length}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {snapshots.length < 2 && (
+        <p className="text-xs text-muted-foreground text-center">
+          O gráfico de evolução acumula dados a cada acesso. Volte amanhã para ver a linha de evolução.
+        </p>
+      )}
+
+      {/* Breakdown by type */}
+      <Card>
+        <div className="p-4 border-b border-border">
+          <p className="text-sm font-medium">Rentabilidade por classe</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left p-3 font-medium text-muted-foreground text-xs">Classe</th>
+                <th className="text-right p-3 font-medium text-muted-foreground text-xs">Investido</th>
+                <th className="text-right p-3 font-medium text-muted-foreground text-xs">Valor atual</th>
+                <th className="text-right p-3 font-medium text-muted-foreground text-xs">Resultado R$</th>
+                <th className="text-right p-3 font-medium text-muted-foreground text-xs">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {typeBreakdown.map(row => (
+                <tr key={row.type} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{row.icon}</span>
+                      <span className="text-xs font-medium">{row.label}</span>
+                    </div>
+                  </td>
+                  <td className="p-3 text-right tabular-nums text-xs">{formatCurrency(row.cost)}</td>
+                  <td className="p-3 text-right tabular-nums text-xs">{formatCurrency(row.value)}</td>
+                  <td className={`p-3 text-right tabular-nums text-xs font-semibold ${variationColor(row.gain)}`}>
+                    {row.gain >= 0 ? "+" : ""}{formatCurrency(row.gain)}
+                  </td>
+                  <td className="p-3 text-right">
+                    <VariationBadge value={row.pct} size="sm" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-muted/30 border-t border-border">
+                <td className="p-3 text-xs font-semibold">Total</td>
+                <td className="p-3 text-right tabular-nums text-xs font-semibold">{formatCurrency(summary.totalCost)}</td>
+                <td className="p-3 text-right tabular-nums text-xs font-semibold">{formatCurrency(summary.totalValue)}</td>
+                <td className={`p-3 text-right tabular-nums text-xs font-semibold ${variationColor(summary.totalGain)}`}>
+                  {summary.totalGain >= 0 ? "+" : ""}{formatCurrency(summary.totalGain)}
+                </td>
+                <td className="p-3 text-right">
+                  <VariationBadge value={summary.totalGainPercent} size="sm" />
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </Card>
+
+      {/* Top & worst performers */}
+      {(top5.length > 0 || worst5.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {top5.length > 0 && (
+            <Card>
+              <div className="p-4 border-b border-border">
+                <p className="text-sm font-medium text-emerald-500">↑ Melhores desempenhos</p>
+              </div>
+              <div className="divide-y divide-border">
+                {top5.map(p => (
+                  <div key={`${p.ticker}-${p.assetType}`} className="flex items-center justify-between p-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate max-w-[160px]">{p.ticker}</p>
+                      <p className="text-[10px] text-muted-foreground">{assetBadgeLabel[p.assetType] ?? p.assetType}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-xs font-semibold tabular-nums ${variationColor(p.gain)}`}>
+                        {p.gain >= 0 ? "+" : ""}{formatCurrency(p.gain)}
+                      </p>
+                      <VariationBadge value={p.gainPercent} size="sm" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {worst5.length > 0 && (
+            <Card>
+              <div className="p-4 border-b border-border">
+                <p className="text-sm font-medium text-rose-500">↓ Piores desempenhos</p>
+              </div>
+              <div className="divide-y divide-border">
+                {worst5.map(p => (
+                  <div key={`${p.ticker}-${p.assetType}`} className="flex items-center justify-between p-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate max-w-[160px]">{p.ticker}</p>
+                      <p className="text-[10px] text-muted-foreground">{assetBadgeLabel[p.assetType] ?? p.assetType}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-xs font-semibold tabular-nums ${variationColor(p.gain)}`}>
+                        {formatCurrency(p.gain)}
+                      </p>
+                      <VariationBadge value={p.gainPercent} size="sm" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const SWIMLANE_ORDER = [
+  { type: "FIXED_INCOME", label: "Renda Fixa",  icon: "🏦", color: "#f43f5e" },
+  { type: "STOCK",        label: "Ações BR",     icon: "📈", color: "#3b82f6" },
+  { type: "FII",          label: "FIIs",         icon: "🏢", color: "#10b981" },
+  { type: "ETF",          label: "ETFs",         icon: "📊", color: "#8b5cf6" },
+  { type: "US_STOCK",     label: "Ações US",     icon: "🇺🇸", color: "#06b6d4" },
+  { type: "CRYPTO",       label: "Cripto",       icon: "₿",  color: "#f59e0b" },
+  { type: "OTHER",        label: "Outros",       icon: "📦", color: "#71717a" },
 ]
 
 const assetBadgeColor: Record<string, string> = {
@@ -158,155 +347,41 @@ export function PortfolioTabs({
 
           {/* Tab content */}
           {tab === "resumo" && (
-            <div className="space-y-6">
-              {/* Evolution chart */}
-              {snapshots.length >= 2 && (
-                <Card>
-                  <CardContent className="p-5">
-                    <p className="text-sm font-medium mb-4">Evolução patrimonial</p>
-                    <PerformanceChart snapshots={snapshots} />
-                  </CardContent>
-                </Card>
-              )}
-
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <Card>
-                  <CardContent className="p-5">
-                    <p className="text-sm font-medium mb-4">Alocação</p>
-                    <AllocationChart positions={positions} totalValue={summary.totalValue} />
-                  </CardContent>
-                </Card>
-                <DividendProjection positions={positions} />
-              </div>
-
-              {/* Positions table */}
+            <div className="space-y-4">
+              {/* Allocation bar — full width */}
               <Card>
-                <div className="p-4 border-b border-border">
-                  <p className="text-sm font-medium">Posições ({positions.length})</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-4 font-medium text-muted-foreground">Ativo</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground">Qtd.</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground">P. Médio / Custo</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground">Cotação / Saldo</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground">Hoje</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground hidden md:table-cell">Valor</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">Resultado</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">%</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">Peso</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {positions.map(p => {
-                        const isMarket = ["STOCK", "FII", "ETF", "US_STOCK", "CRYPTO"].includes(p.assetType)
-                        const href = p.assetType === "FII" ? `/fiis/${p.ticker}` : p.assetType === "ETF" ? `/etfs/${p.ticker}` : `/acoes/${p.ticker}`
-                        return (
-                          <tr key={`${p.ticker}-${p.assetType}`} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
-                            <td className="p-4">
-                              <div className="flex items-center gap-3">
-                                {p.logoUrl ? (
-                                  <div className="w-8 h-8 rounded-full overflow-hidden bg-muted shrink-0">
-                                    <Image src={p.logoUrl} alt={p.ticker} width={32} height={32} className="object-cover" />
-                                  </div>
-                                ) : (
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${assetBadgeColor[p.assetType] ?? "bg-muted text-muted-foreground"}`}>
-                                    {assetBadgeLabel[p.assetType] ?? p.assetType}
-                                  </span>
-                                )}
-                                <div>
-                                  {isMarket ? (
-                                    <Link href={href} className="font-semibold hover:text-primary transition-colors">
-                                      {p.ticker}
-                                    </Link>
-                                  ) : (
-                                    <p className="font-semibold text-xs leading-tight max-w-[160px]">{p.ticker}</p>
-                                  )}
-                                  {isMarket && <p className="text-xs text-muted-foreground truncate max-w-[120px]">{p.name}</p>}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4 text-right tabular-nums text-xs">
-                              {isMarket ? p.quantity.toFixed(p.quantity % 1 === 0 ? 0 : 3) : "—"}
-                            </td>
-                            <td className="p-4 text-right tabular-nums text-xs">
-                              {isMarket
-                                ? formatCurrency(p.averagePrice)
-                                : <span className="tabular-nums">{formatCurrency(p.averagePrice)}</span>}
-                            </td>
-                            <td className="p-4 text-right tabular-nums text-xs font-medium">
-                              {isMarket ? formatCurrency(p.currentPrice) : <span className="tabular-nums">{formatCurrency(p.currentValue)}</span>}
-                            </td>
-                            <td className="p-4 text-right">
-                              {isMarket ? <VariationBadge value={p.changePercent} size="sm" /> : <span className="text-xs text-muted-foreground">—</span>}
-                            </td>
-                            <td className="p-4 text-right tabular-nums text-xs hidden md:table-cell">{formatCurrency(p.currentValue)}</td>
-                            <td className={`p-4 text-right tabular-nums text-xs hidden lg:table-cell ${variationColor(p.gain)}`}>
-                              {p.gain !== 0 ? `${p.gain >= 0 ? "+" : ""}${formatCurrency(p.gain)}` : "—"}
-                            </td>
-                            <td className="p-4 text-right hidden lg:table-cell">
-                              {p.gainPercent !== 0 ? <VariationBadge value={p.gainPercent} size="sm" /> : <span className="text-xs text-muted-foreground">—</span>}
-                            </td>
-                            <td className="p-4 text-right tabular-nums text-xs text-muted-foreground hidden lg:table-cell">
-                              {p.weight.toFixed(1)}%
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <CardContent className="p-4">
+                  <p className="text-sm font-medium mb-3">Patrimônio por classe</p>
+                  <TypeAllocationBar positions={positions} totalValue={summary.totalValue} />
+                </CardContent>
               </Card>
+
+              {/* Swimlanes */}
+              {SWIMLANE_ORDER.map(cfg => {
+                const lane = positions.filter(p => p.assetType === cfg.type)
+                if (lane.length === 0) return null
+                return (
+                  <SwimlaneSection
+                    key={cfg.type}
+                    assetType={cfg.type}
+                    label={cfg.label}
+                    icon={cfg.icon}
+                    accentColor={cfg.color}
+                    positions={lane}
+                    totalValue={summary.totalValue}
+                  />
+                )
+              })}
             </div>
           )}
 
           {tab === "rentabilidade" && (
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="p-5">
-                  <p className="text-sm font-medium mb-4">Evolução patrimonial</p>
-                  <PerformanceChart snapshots={snapshots} />
-                </CardContent>
-              </Card>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground">Rentabilidade total</p>
-                    <p className={`text-2xl font-bold ${variationColor(summary.totalGainPercent)}`}>
-                      {formatPercent(summary.totalGainPercent)}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground">Resultado em R$</p>
-                    <p className={`text-2xl font-bold ${variationColor(summary.totalGain)}`}>
-                      {summary.totalGain >= 0 ? "+" : ""}{formatCurrency(summary.totalGain)}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="col-span-2 md:col-span-1">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground">Lançamentos registrados</p>
-                    <p className="text-2xl font-bold">{transactions.length}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Compras: {transactions.filter(t => t.type === "BUY").length} ·
-                      Vendas: {transactions.filter(t => t.type === "SELL").length} ·
-                      Proventos: {transactions.filter(t => t.type === "DIVIDEND" || t.type === "JCP").length}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-              {snapshots.length < 2 && (
-                <Card>
-                  <CardContent className="p-6 text-center text-muted-foreground text-sm">
-                    O gráfico de evolução acumula dados a cada acesso à carteira. Volte amanhã para ver a linha de evolução.
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            <RentabilidadeTab
+              snapshots={snapshots}
+              positions={positions}
+              transactions={transactions}
+              summary={summary}
+            />
           )}
 
           {tab === "projecao" && (

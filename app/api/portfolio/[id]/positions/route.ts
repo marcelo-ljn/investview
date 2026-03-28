@@ -64,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   })
 }
 
-// DELETE: wipe all transactions and positions (full reset)
+// DELETE: wipe all (or just one assetType) — ?assetType=FIXED_INCOME for scoped reset
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -73,9 +73,29 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const portfolio = await prisma.portfolio.findFirst({ where: { id, userId: session.user.id } })
   if (!portfolio) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  await prisma.transaction.deleteMany({ where: { portfolioId: id } })
-  await prisma.position.deleteMany({ where: { portfolioId: id } })
-  await prisma.portfolioSnapshot.deleteMany({ where: { portfolioId: id } })
+  const { searchParams } = new URL(req.url)
+  const assetType = searchParams.get("assetType")
+
+  if (assetType) {
+    // Scoped reset: delete only transactions of this assetType, then rebuild all positions
+    await prisma.transaction.deleteMany({ where: { portfolioId: id, assetType: assetType as any } })
+    await prisma.position.deleteMany({ where: { portfolioId: id } })
+
+    // Rebuild from remaining transactions
+    const { applyTransactionToPosition } = await import("@/lib/portfolio-position")
+    const remaining = await prisma.transaction.findMany({
+      where: { portfolioId: id },
+      orderBy: { date: "asc" },
+    })
+    for (const tx of remaining) {
+      await applyTransactionToPosition(id, tx)
+    }
+  } else {
+    // Full reset
+    await prisma.transaction.deleteMany({ where: { portfolioId: id } })
+    await prisma.position.deleteMany({ where: { portfolioId: id } })
+    await prisma.portfolioSnapshot.deleteMany({ where: { portfolioId: id } })
+  }
 
   return NextResponse.json({ ok: true })
 }
