@@ -2,9 +2,11 @@
 import { useState, useMemo } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatCurrency } from "@/lib/utils"
-import { Search, TrendingUp, TrendingDown, DollarSign, RotateCcw, Trash2, AlertTriangle } from "lucide-react"
+import { Search, TrendingUp, TrendingDown, DollarSign, RotateCcw, Trash2, AlertTriangle, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Transaction {
@@ -44,6 +46,8 @@ function TypeIcon({ type }: { type: string }) {
   return <DollarSign className="h-3.5 w-3.5 text-amber-500" />
 }
 
+const VALUE_BASED = ["FIXED_INCOME", "OTHER"]
+
 export function TransactionsTab({ transactions, portfolioId }: TransactionsTabProps) {
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("ALL")
@@ -52,6 +56,9 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [resetting, setResetting] = useState(false)
   const [localTxs, setLocalTxs] = useState(transactions)
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [editForm, setEditForm] = useState<Partial<Transaction>>({})
+  const [saving, setSaving] = useState(false)
 
   const filtered = useMemo(() => {
     return localTxs.filter(tx => {
@@ -84,6 +91,38 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
       }
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  function openEdit(tx: Transaction) {
+    setEditingTx(tx)
+    setEditForm({
+      ticker: tx.ticker,
+      assetType: tx.assetType,
+      type: tx.type,
+      date: new Date(tx.date).toISOString().split("T")[0],
+      quantity: tx.quantity,
+      price: tx.price,
+      fees: tx.fees,
+      notes: tx.notes ?? "",
+    })
+  }
+
+  async function handleSaveEdit() {
+    if (!editingTx) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/portfolio/${portfolioId}/transactions/${editingTx.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      })
+      if (res.ok) {
+        setEditingTx(null)
+        window.location.reload()
+      }
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -212,14 +251,23 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
                       {tx.fees > 0 ? formatCurrency(tx.fees) : "—"}
                     </td>
                     <td className="p-2 text-right">
-                      <button
-                        onClick={() => handleDelete(tx.id)}
-                        disabled={deletingId === tx.id}
-                        className="p-1 rounded hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors disabled:opacity-50"
-                        title="Excluir lançamento"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(tx)}
+                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          title="Editar lançamento"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(tx.id)}
+                          disabled={deletingId === tx.id}
+                          className="p-1 rounded hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors disabled:opacity-50"
+                          title="Excluir lançamento"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -246,6 +294,68 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
           </table>
         </div>
       </Card>
+    {/* Edit modal */}
+    <Dialog open={!!editingTx} onOpenChange={v => { if (!v) setEditingTx(null) }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar lançamento</DialogTitle>
+        </DialogHeader>
+        {editingTx && (
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>{VALUE_BASED.includes(editForm.assetType ?? "") ? "Nome do ativo" : "Ticker"}</Label>
+              <Input
+                value={editForm.ticker ?? ""}
+                onChange={e => setEditForm(f => ({ ...f, ticker: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Operação</Label>
+                <Select value={editForm.type ?? ""} onValueChange={v => setEditForm(f => ({ ...f, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TYPE_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data</Label>
+                <Input type="date" value={editForm.date as string ?? ""} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {!VALUE_BASED.includes(editForm.assetType ?? "") && (
+                <div className="space-y-1.5">
+                  <Label>Quantidade</Label>
+                  <Input type="number" step="any" value={editForm.quantity ?? ""} onChange={e => setEditForm(f => ({ ...f, quantity: Number(e.target.value) }))} />
+                </div>
+              )}
+              <div className={`space-y-1.5 ${VALUE_BASED.includes(editForm.assetType ?? "") ? "col-span-2" : ""}`}>
+                <Label>{VALUE_BASED.includes(editForm.assetType ?? "") ? "Valor (R$)" : "Preço unit. (R$)"}</Label>
+                <Input type="number" step="0.01" value={editForm.price ?? ""} onChange={e => setEditForm(f => ({ ...f, price: Number(e.target.value) }))} />
+              </div>
+            </div>
+            {!VALUE_BASED.includes(editForm.assetType ?? "") && (
+              <div className="space-y-1.5">
+                <Label>Taxas (R$)</Label>
+                <Input type="number" step="0.01" value={editForm.fees ?? 0} onChange={e => setEditForm(f => ({ ...f, fees: Number(e.target.value) }))} />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Obs.</Label>
+              <Input value={editForm.notes ?? ""} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setEditingTx(null)}>Cancelar</Button>
+              <Button onClick={handleSaveEdit} disabled={saving}>
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
     </div>
   )
 }
