@@ -2,12 +2,33 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { fetchMultipleQuotes } from "@/lib/brapi"
+import { fetchAllRates } from "@/lib/bcb"
+import { calcAccumulatedValue, getInvestedAt } from "@/lib/calc-accumulated"
 import { AddTransactionDialog } from "@/components/features/portfolio/add-transaction-dialog"
 import { ImportCsvDialog } from "@/components/features/portfolio/import-csv-dialog"
 import { PortfolioNotesDialog } from "@/components/features/portfolio/portfolio-notes-dialog"
 import { PortfolioTabs } from "@/components/features/portfolio/portfolio-tabs"
 import { BarChart3 } from "lucide-react"
 import type { Metadata } from "next"
+import type { Indexer } from "@prisma/client"
+
+function calcEffectiveRate(
+  indexer: string | null | undefined,
+  rate: number | null | undefined,
+  bcbRates: { cdi: number; selic: number; ipca: number; igpm: number },
+): number | null {
+  if (!indexer || rate == null) return null
+  switch (indexer) {
+    case "CDI":       return bcbRates.cdi * (rate / 100)
+    case "CDI_PLUS":  return bcbRates.cdi + rate
+    case "SELIC":     return bcbRates.selic * (rate / 100)
+    case "IPCA":
+    case "IPCA_PLUS": return bcbRates.ipca + rate
+    case "IGPM":      return bcbRates.igpm + rate
+    case "PREFIXADO": return rate
+    default:          return null
+  }
+}
 
 export const metadata: Metadata = { title: "Minha Carteira — InvestView" }
 
@@ -58,6 +79,7 @@ export default async function PortfolioPage() {
     currentPrice: number; totalCost: number; currentValue: number;
     gain: number; gainPercent: number; changePercent: number;
     name: string; logoUrl?: string | null; weight: number; dividendsYield?: number | null;
+    indexer?: string | null; rate?: number | null; effectiveAnnualRate?: number | null;
   }> = []
   let summary = { totalValue: 0, totalCost: 0, totalGain: 0, totalGainPercent: 0 }
 
@@ -66,23 +88,46 @@ export default async function PortfolioPage() {
       .filter(p => QUOTABLE_TYPES.includes(p.assetType))
       .map(p => p.ticker)
 
-    const quotes = marketTickers.length > 0 ? await fetchMultipleQuotes(marketTickers) : []
+    const [quotes, bcbRates] = await Promise.all([
+      marketTickers.length > 0 ? fetchMultipleQuotes(marketTickers) : Promise.resolve([]),
+      fetchAllRates(),
+    ])
     const quoteMap = new Map(quotes.map(q => [q.symbol, q]))
 
     const VALUE_BASED_TYPES = ["FIXED_INCOME", "OTHER"]
 
-    positions = portfolio.positions.map(p => {
+    positions = await Promise.all(portfolio.positions.map(async (p) => {
       const isMarket = MARKET_TYPES.includes(p.assetType)
       const isValueBased = VALUE_BASED_TYPES.includes(p.assetType)
       const quote = isMarket ? quoteMap.get(p.ticker) : undefined
 
-      // Value-based (FIXED_INCOME/OTHER): qty = BRL balance (saldo), avgPrice = BRL cost basis (custo)
-      // currentValue = saldo, totalCost = custo, gain = saldo - custo (interest earned)
-      const currentValue = isValueBased ? p.quantity : p.quantity * (quote?.regularMarketPrice ?? p.averagePrice)
-      const totalCost = isValueBased ? p.averagePrice : p.quantity * p.averagePrice
-      const currentPrice = isValueBased ? p.quantity : (quote?.regularMarketPrice ?? p.averagePrice)
+      let currentValue: number
+      let totalCost: number
+      let currentPrice: number
+
+      if (isValueBased) {
+        totalCost = p.averagePrice   // cost basis (fixed)
+        currentPrice = p.quantity   // saldo
+        currentValue = p.quantity   // default: static saldo
+
+        // Use CDI-compounded value if indexer is set
+        if (p.indexer) {
+          const investedAt = await getInvestedAt(portfolio.id, p.ticker)
+          if (investedAt) {
+            const accumulated = await calcAccumulatedValue(totalCost, investedAt, p.indexer as Indexer, p.rate)
+            currentValue = accumulated
+            currentPrice = accumulated
+          }
+        }
+      } else {
+        currentPrice = quote?.regularMarketPrice ?? p.averagePrice
+        totalCost = p.quantity * p.averagePrice
+        currentValue = p.quantity * currentPrice
+      }
+
       const gain = currentValue - totalCost
       const gainPercent = totalCost > 0 ? (gain / totalCost) * 100 : 0
+      const effectiveAnnualRate = calcEffectiveRate(p.indexer, p.rate, bcbRates)
 
       return {
         ticker: p.ticker, assetType: p.assetType, quantity: p.quantity,
@@ -90,8 +135,9 @@ export default async function PortfolioPage() {
         gain, gainPercent, changePercent: quote?.regularMarketChangePercent ?? 0,
         name: quote?.shortName ?? p.ticker, logoUrl: quote?.logourl, weight: 0,
         dividendsYield: isMarket ? quote?.dividendsYield : undefined,
+        indexer: p.indexer, rate: p.rate, effectiveAnnualRate,
       }
-    })
+    }))
 
     const totalValue = positions.reduce((s, p) => s + p.currentValue, 0)
     const totalCost = positions.reduce((s, p) => s + p.totalCost, 0)
