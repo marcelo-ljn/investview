@@ -1,8 +1,15 @@
 @AGENTS.md
 
-# Database Access
+# Deployment & Database
 
-## Environments
+## URLs
+
+| Env | URL | Status |
+|---|---|---|
+| **Production** | `https://investview-rho.vercel.app/` | Vercel (investview-rho project) |
+| **Local** | `http://localhost:3000/` | Dev server |
+
+## Database Access
 
 | Env | Neon Endpoint | How to connect |
 |---|---|---|
