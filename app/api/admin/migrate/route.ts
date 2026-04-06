@@ -130,6 +130,53 @@ async function applyIndexerToPositions() {
   return { positionsUpdated: updated, transactionsUpdated: txUpdated, skipped }
 }
 
+async function debugCDI(userId: string) {
+  // Find first RF/OTHER position with indexer for this user
+  const pos = await prisma.position.findFirst({
+    where: {
+      assetType: { in: ["FIXED_INCOME", "OTHER"] },
+      indexer: { not: null },
+      portfolio: { userId },
+    },
+    include: { portfolio: true },
+  })
+  if (!pos) return { error: "No position with indexer found" }
+
+  // Get investedAt (first BUY transaction)
+  const firstBuy = await prisma.transaction.findFirst({
+    where: { portfolioId: pos.portfolioId, ticker: pos.ticker, type: "BUY" },
+    orderBy: { date: "asc" },
+  })
+
+  // Count CDI records in DB
+  const cdiTotal = await prisma.economicRate.count({ where: { name: "CDI" } })
+
+  // Query CDI rates for this position's date range
+  const now = new Date()
+  const cdiRates = firstBuy ? await prisma.economicRate.findMany({
+    where: { name: "CDI", date: { gte: firstBuy.date, lte: now } },
+    orderBy: { date: "asc" },
+    take: 3,
+  }) : []
+
+  // Also get latest CDI records from DB regardless of date filter
+  const latestCDI = await prisma.economicRate.findMany({
+    where: { name: "CDI" },
+    orderBy: { date: "desc" },
+    take: 3,
+  })
+
+  return {
+    position: { ticker: pos.ticker, indexer: pos.indexer, rate: pos.rate, averagePrice: pos.averagePrice },
+    firstBuyDate: firstBuy?.date ?? null,
+    firstBuyDateRaw: firstBuy ? JSON.stringify(firstBuy.date) : null,
+    nowRaw: JSON.stringify(now),
+    cdiTotalInDB: cdiTotal,
+    cdiRatesForRange: cdiRates.map(r => ({ date: r.date, dateRaw: JSON.stringify(r.date), value: r.value })),
+    latestCDIInDB: latestCDI.map(r => ({ date: r.date, dateRaw: JSON.stringify(r.date), value: r.value })),
+  }
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -143,6 +190,11 @@ export async function GET(req: NextRequest) {
   const toDate = toParam ? new Date(toParam) : new Date()
 
   const result: Record<string, unknown> = {}
+
+  if (step === "debug") {
+    result.debug = await debugCDI(session.user.id)
+    return NextResponse.json({ ok: true, ...result })
+  }
 
   if (step === "backfill" || step === "all") {
     result.backfill = await backfillCDI(fromDate, toDate)
