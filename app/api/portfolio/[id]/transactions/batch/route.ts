@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma"
 import { applyTransactionToPosition } from "@/lib/portfolio-position"
 import { z } from "zod"
 
+const INDEXER_VALUES = ["CDI", "SELIC", "IPCA", "IGPM", "PREFIXADO", "IPCA_PLUS", "CDI_PLUS"] as const
+
 const txSchema = z.object({
   ticker: z.string().min(1).max(200).transform(v => v.trim()),
   assetType: z.enum(["STOCK", "FII", "ETF", "US_STOCK", "CRYPTO", "FIXED_INCOME", "OTHER"]),
@@ -13,6 +15,8 @@ const txSchema = z.object({
   price: z.number().positive(),
   fees: z.number().min(0).default(0),
   costOverride: z.number().positive().optional(),
+  indexer: z.enum(INDEXER_VALUES).optional(),
+  rate: z.number().positive().optional(),
   notes: z.string().optional(),
 })
 
@@ -57,6 +61,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       price: tx.price,
       fees: tx.fees,
       costOverride: tx.costOverride,
+      indexer: tx.indexer,
+      rate: tx.rate,
       notes: tx.notes,
     })),
     skipDuplicates: false,

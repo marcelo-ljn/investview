@@ -22,6 +22,9 @@ interface Position {
   name: string
   logoUrl?: string | null
   weight: number
+  indexer?: string | null
+  rate?: number | null
+  effectiveAnnualRate?: number | null
 }
 
 interface Props {
@@ -107,9 +110,13 @@ function buildChartData(
   firstTxDate: string | undefined,
   period: Period,
   assetType: string,
+  effectiveAnnualRatePct: number | null,
 ): { points: ChartPoint[]; todayLabel: string } {
   const cfg = PERIOD_CONFIG[period]
-  const rate = ANNUAL_RATES[assetType] ?? 0
+  // Use effective rate (in %) if available, else fallback to ANNUAL_RATES (already decimal)
+  const rate = effectiveAnnualRatePct != null
+    ? effectiveAnnualRatePct / 100
+    : (ANNUAL_RATES[assetType] ?? 0)
   const periodRate = rate * cfg.factor
   const today = new Date()
   const points: ChartPoint[] = []
@@ -142,6 +149,19 @@ function buildChartData(
   return { points, todayLabel }
 }
 
+export function formatRateLabel(indexer: string, rate: number): string {
+  switch (indexer) {
+    case "CDI":       return `${rate}% CDI`
+    case "CDI_PLUS":  return `CDI+${rate}%`
+    case "SELIC":     return `${rate}% SELIC`
+    case "IPCA":
+    case "IPCA_PLUS": return `IPCA+${rate}%`
+    case "IGPM":      return `IGPM+${rate}%`
+    case "PREFIXADO": return `${rate}% a.a.`
+    default:          return `${rate}%`
+  }
+}
+
 const VALUE_BASED = ["FIXED_INCOME", "OTHER"]
 
 const assetBadgeColor: Record<string, string> = {
@@ -170,12 +190,22 @@ export function SwimlaneSection({ assetType, label, icon, accentColor, positions
   const isValueBased = VALUE_BASED.includes(assetType)
   const isMarket = !isValueBased
 
+  // Weighted-average effective rate across all positions that have one
+  const effectiveRateForChart = useMemo(() => {
+    const posWithRate = positions.filter(p => p.effectiveAnnualRate != null)
+    if (posWithRate.length === 0) return null
+    const totalVal = posWithRate.reduce((s, p) => s + p.currentValue, 0)
+    if (totalVal === 0) return null
+    return posWithRate.reduce((s, p) => s + (p.effectiveAnnualRate! * p.currentValue / totalVal), 0)
+  }, [positions])
+
   const { points: chartData, todayLabel } = useMemo(
-    () => buildChartData(totalCost, totalBalance, firstTxDate, period, assetType),
-    [period, assetType, totalBalance, totalCost, firstTxDate],
+    () => buildChartData(totalCost, totalBalance, firstTxDate, period, assetType, effectiveRateForChart),
+    [period, assetType, totalBalance, totalCost, firstTxDate, effectiveRateForChart],
   )
 
-  const showChart = totalBalance > 0 && (ANNUAL_RATES[assetType] ?? 0) > 0
+  const projectionRate = effectiveRateForChart != null ? effectiveRateForChart / 100 : (ANNUAL_RATES[assetType] ?? 0)
+  const showChart = totalBalance > 0 && projectionRate > 0
 
   return (
     <Card className="overflow-hidden">
@@ -302,7 +332,11 @@ export function SwimlaneSection({ assetType, label, icon, accentColor, positions
                 </AreaChart>
               </ResponsiveContainer>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Taxa projetada: {((ANNUAL_RATES[assetType] ?? 0) * 100).toFixed(0)}% a.a. — apenas referência, não é garantia de rendimento.
+                Taxa projetada:{" "}
+                {effectiveRateForChart != null
+                  ? `${effectiveRateForChart.toFixed(1)}% a.a. (via BCB)`
+                  : `${(projectionRate * 100).toFixed(0)}% a.a.`}
+                {" "}— apenas referência, não é garantia de rendimento.
               </p>
             </div>
           )}
@@ -354,6 +388,9 @@ export function SwimlaneSection({ assetType, label, icon, accentColor, positions
                               <p className="font-medium text-xs leading-tight max-w-[180px]">{p.ticker}</p>
                             )}
                             {isMarket && <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{p.name}</p>}
+                            {isValueBased && p.indexer && p.rate != null && (
+                              <p className="text-[10px] text-muted-foreground">{formatRateLabel(p.indexer, p.rate)}</p>
+                            )}
                           </div>
                         </div>
                       </td>

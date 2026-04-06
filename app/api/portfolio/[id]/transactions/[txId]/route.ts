@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma"
 import { applyTransactionToPosition } from "@/lib/portfolio-position"
 import { z } from "zod"
 
+const INDEXER_VALUES = ["CDI", "SELIC", "IPCA", "IGPM", "PREFIXADO", "IPCA_PLUS", "CDI_PLUS"] as const
+
 const updateSchema = z.object({
   ticker: z.string().min(1).max(200).transform(v => v.trim()).optional(),
   assetType: z.enum(["STOCK", "FII", "ETF", "US_STOCK", "CRYPTO", "FIXED_INCOME", "OTHER"]).optional(),
@@ -12,6 +14,8 @@ const updateSchema = z.object({
   quantity: z.number().positive().optional(),
   price: z.number().positive().optional(),
   fees: z.number().min(0).optional(),
+  indexer: z.enum(INDEXER_VALUES).nullable().optional(),
+  rate: z.number().positive().nullable().optional(),
   notes: z.string().optional(),
 })
 
@@ -56,6 +60,8 @@ export async function PATCH(
       ...(data.quantity !== undefined && { quantity: data.quantity }),
       ...(data.price !== undefined && { price: data.price }),
       ...(data.fees !== undefined && { fees: data.fees }),
+      ...(data.indexer !== undefined && { indexer: data.indexer }),
+      ...(data.rate !== undefined && { rate: data.rate }),
       ...(data.notes !== undefined && { notes: data.notes }),
     },
   })

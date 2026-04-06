@@ -16,11 +16,13 @@ interface Position {
   currentPrice: number; totalCost: number; currentValue: number;
   gain: number; gainPercent: number; changePercent: number;
   name: string; logoUrl?: string | null; weight: number; dividendsYield?: number | null;
+  indexer?: string | null; rate?: number | null; effectiveAnnualRate?: number | null;
 }
 
 interface Transaction {
   id: string; ticker: string; assetType: string; type: string;
-  date: string | Date; quantity: number; price: number; fees: number; notes?: string | null;
+  date: string | Date; quantity: number; price: number; fees: number;
+  indexer?: string | null; rate?: number | null; notes?: string | null;
 }
 
 interface Snapshot { date: string | Date; totalValue: number; totalCost: number }

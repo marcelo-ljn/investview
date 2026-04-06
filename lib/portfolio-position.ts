@@ -17,6 +17,7 @@
  */
 
 import { prisma } from "@/lib/prisma"
+import type { Indexer } from "@prisma/client"
 
 const VALUE_BASED = ["FIXED_INCOME", "OTHER"]
 
@@ -27,6 +28,8 @@ export interface TxInput {
   quantity: number
   price: number
   costOverride?: number | null  // For VALUE_BASED: original cost basis (if different from amount)
+  indexer?: Indexer | string | null
+  rate?: number | null
 }
 
 export async function applyTransactionToPosition(portfolioId: string, tx: TxInput) {
@@ -37,6 +40,11 @@ export async function applyTransactionToPosition(portfolioId: string, tx: TxInpu
     const cost   = tx.costOverride ?? amount       // cost basis (defaults to amount if not provided)
     const existing = await prisma.position.findFirst({ where: { portfolioId, ticker: tx.ticker } })
 
+    // Only update indexer/rate when the transaction provides them
+    const rateFields = tx.indexer
+      ? { indexer: tx.indexer as Indexer, rate: tx.rate ?? null }
+      : {}
+
     if (tx.type === "BUY") {
       if (existing) {
         await prisma.position.update({
@@ -44,6 +52,7 @@ export async function applyTransactionToPosition(portfolioId: string, tx: TxInpu
           data: {
             quantity:     existing.quantity     + amount,  // saldo increases
             averagePrice: existing.averagePrice + cost,    // cost basis increases
+            ...rateFields,
           },
         })
       } else {
@@ -54,6 +63,7 @@ export async function applyTransactionToPosition(portfolioId: string, tx: TxInpu
             assetType:    tx.assetType as "FIXED_INCOME" | "OTHER",
             quantity:     amount,  // saldo
             averagePrice: cost,    // cost basis
+            ...rateFields,
           },
         })
       }

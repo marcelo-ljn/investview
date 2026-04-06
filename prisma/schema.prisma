@@ -144,8 +144,6 @@ model Stock {
   fundamentals StockFundamentals[]
   dividends    StockDividend[]
   watchlist    Watchlist[]   @relation("WatchlistStock")
-  positions    Position[]    @relation("PositionStock")
-
   @@map("stocks")
 }
 
@@ -235,8 +233,6 @@ model FII {
   fundamentals FIIFundamentals[]
   dividends    FIIDividend[]
   watchlist    Watchlist[]   @relation("WatchlistFII")
-  positions    Position[]    @relation("PositionFII")
-
   @@map("fiis")
 }
 
@@ -375,28 +371,30 @@ model Position {
   assetType     AssetType
   quantity      Float
   averagePrice  Float
+  indexer       Indexer?  // Para FIXED_INCOME/OTHER: tipo de indexação
+  rate          Float?    // CDI/SELIC: % do índice (ex: 110); CDI+/IPCA+/IGPM: spread a.a.; PREFIXADO: taxa a.a.
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  stock     Stock?    @relation("PositionStock", fields: [ticker], references: [ticker], map: "positions_stock_ticker_fkey")
-  fii       FII?      @relation("PositionFII", fields: [ticker], references: [ticker], map: "positions_fii_ticker_fkey")
 
   @@unique([portfolioId, ticker])
   @@map("positions")
 }
 
 model Transaction {
-  id          String          @id @default(cuid())
-  portfolioId String
-  ticker      String
-  assetType   AssetType
-  type        TransactionType
-  date        DateTime        @db.Date
-  quantity    Float
-  price       Float
+  id           String          @id @default(cuid())
+  portfolioId  String
+  ticker       String
+  assetType    AssetType
+  type         TransactionType
+  date         DateTime        @db.Date
+  quantity     Float
+  price        Float
   fees         Float           @default(0)
   costOverride Float?          // FIXED_INCOME/OTHER: custo original separado do saldo (amount)
+  indexer      Indexer?        // Para FIXED_INCOME/OTHER: tipo de indexação
+  rate         Float?          // CDI/SELIC: % do índice (ex: 110); CDI+/IPCA+/IGPM: spread a.a.; PREFIXADO: taxa a.a.
   notes        String?
   createdAt    DateTime        @default(now())
 

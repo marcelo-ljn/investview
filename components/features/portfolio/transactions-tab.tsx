@@ -18,6 +18,8 @@ interface Transaction {
   quantity: number
   price: number
   fees: number
+  indexer?: string | null
+  rate?: number | null
   notes?: string | null
 }
 
@@ -40,6 +42,35 @@ const ASSET_LABELS: Record<string, string> = {
   CRYPTO: "Cripto", FIXED_INCOME: "Renda Fixa", OTHER: "Outro",
 }
 
+const INDEXER_OPTIONS = [
+  { value: "CDI",       label: "CDI (%)" },
+  { value: "CDI_PLUS",  label: "CDI+ (spread a.a.)" },
+  { value: "SELIC",     label: "SELIC (%)" },
+  { value: "IPCA",      label: "IPCA + spread" },
+  { value: "IPCA_PLUS", label: "IPCA+ (spread a.a.)" },
+  { value: "IGPM",      label: "IGPM+ (spread a.a.)" },
+  { value: "PREFIXADO", label: "Pré-fixado (a.a.)" },
+]
+
+function getRateLabel(indexer: string): string {
+  if (indexer === "CDI" || indexer === "SELIC") return "% do índice (ex: 110)"
+  if (indexer === "PREFIXADO") return "Taxa a.a. (ex: 13.5)"
+  return "Spread a.a. (ex: 5.5)"
+}
+
+export function formatRateLabel(indexer: string, rate: number): string {
+  switch (indexer) {
+    case "CDI":       return `${rate}% CDI`
+    case "CDI_PLUS":  return `CDI+${rate}%`
+    case "SELIC":     return `${rate}% SELIC`
+    case "IPCA":
+    case "IPCA_PLUS": return `IPCA+${rate}%`
+    case "IGPM":      return `IGPM+${rate}%`
+    case "PREFIXADO": return `${rate}% a.a.`
+    default:          return `${rate}%`
+  }
+}
+
 function TypeIcon({ type }: { type: string }) {
   if (type === "BUY" || type === "SUBSCRIPTION") return <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
   if (type === "SELL") return <TrendingDown className="h-3.5 w-3.5 text-rose-500" />
@@ -47,6 +78,19 @@ function TypeIcon({ type }: { type: string }) {
 }
 
 const VALUE_BASED = ["FIXED_INCOME", "OTHER"]
+
+interface EditForm {
+  ticker?: string
+  assetType?: string
+  type?: string
+  date?: string | Date
+  quantity?: number
+  price?: number
+  fees?: number
+  indexer?: string
+  rate?: string
+  notes?: string
+}
 
 export function TransactionsTab({ transactions, portfolioId }: TransactionsTabProps) {
   const [search, setSearch] = useState("")
@@ -57,7 +101,7 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
   const [resetting, setResetting] = useState(false)
   const [localTxs, setLocalTxs] = useState(transactions)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
-  const [editForm, setEditForm] = useState<Partial<Transaction>>({})
+  const [editForm, setEditForm] = useState<EditForm>({})
   const [saving, setSaving] = useState(false)
 
   const filtered = useMemo(() => {
@@ -104,6 +148,8 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
       quantity: tx.quantity,
       price: tx.price,
       fees: tx.fees,
+      indexer: tx.indexer ?? "",
+      rate: tx.rate != null ? String(tx.rate) : "",
       notes: tx.notes ?? "",
     })
   }
@@ -112,10 +158,23 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
     if (!editingTx) return
     setSaving(true)
     try {
+      const isValueBased = VALUE_BASED.includes(editForm.assetType ?? "")
+      const body: Record<string, unknown> = { ...editForm }
+      if (isValueBased && editForm.indexer) {
+        body.indexer = editForm.indexer
+        body.rate = editForm.rate ? Number(editForm.rate) : null
+      } else if (isValueBased && !editForm.indexer) {
+        body.indexer = null
+        body.rate = null
+      } else {
+        delete body.indexer
+        delete body.rate
+      }
+
       const res = await fetch(`/api/portfolio/${portfolioId}/transactions/${editingTx.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(body),
       })
       if (res.ok) {
         setEditingTx(null)
@@ -145,6 +204,8 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
       setResetting(false)
     }
   }
+
+  const isEditValueBased = VALUE_BASED.includes(editForm.assetType ?? "")
 
   return (
     <div className="space-y-4">
@@ -224,6 +285,7 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
               {filtered.map(tx => {
                 const total = tx.quantity * tx.price
                 const date = new Date(tx.date)
+                const isValueBased = VALUE_BASED.includes(tx.assetType)
                 return (
                   <tr key={tx.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="p-3 text-muted-foreground text-xs whitespace-nowrap">
@@ -233,6 +295,11 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
                       <p className="font-medium text-xs leading-tight max-w-[140px] truncate" title={tx.ticker}>
                         {tx.ticker}
                       </p>
+                      {isValueBased && tx.indexer && tx.rate != null && (
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatRateLabel(tx.indexer, tx.rate)}
+                        </p>
+                      )}
                     </td>
                     <td className="p-3 hidden sm:table-cell">
                       <span className="text-[10px] text-muted-foreground">
@@ -302,6 +369,7 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
           </table>
         </div>
       </Card>
+
     {/* Edit modal */}
     <Dialog open={!!editingTx} onOpenChange={v => { if (!v) setEditingTx(null) }}>
       <DialogContent className="sm:max-w-md">
@@ -311,7 +379,7 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
         {editingTx && (
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>{VALUE_BASED.includes(editForm.assetType ?? "") ? "Nome do ativo" : "Ticker"}</Label>
+              <Label>{isEditValueBased ? "Nome do ativo" : "Ticker"}</Label>
               <Input
                 value={editForm.ticker ?? ""}
                 onChange={e => setEditForm(f => ({ ...f, ticker: e.target.value }))}
@@ -333,23 +401,57 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {!VALUE_BASED.includes(editForm.assetType ?? "") && (
+              {!isEditValueBased && (
                 <div className="space-y-1.5">
                   <Label>Quantidade</Label>
                   <Input type="number" step="any" value={editForm.quantity ?? ""} onChange={e => setEditForm(f => ({ ...f, quantity: Number(e.target.value) }))} />
                 </div>
               )}
-              <div className={`space-y-1.5 ${VALUE_BASED.includes(editForm.assetType ?? "") ? "col-span-2" : ""}`}>
-                <Label>{VALUE_BASED.includes(editForm.assetType ?? "") ? "Valor (R$)" : "Preço unit. (R$)"}</Label>
+              <div className={`space-y-1.5 ${isEditValueBased ? "col-span-2" : ""}`}>
+                <Label>{isEditValueBased ? "Valor / saldo (R$)" : "Preço unit. (R$)"}</Label>
                 <Input type="number" step="0.01" value={editForm.price ?? ""} onChange={e => setEditForm(f => ({ ...f, price: Number(e.target.value) }))} />
               </div>
             </div>
-            {!VALUE_BASED.includes(editForm.assetType ?? "") && (
+            {!isEditValueBased && (
               <div className="space-y-1.5">
                 <Label>Taxas (R$)</Label>
                 <Input type="number" step="0.01" value={editForm.fees ?? 0} onChange={e => setEditForm(f => ({ ...f, fees: Number(e.target.value) }))} />
               </div>
             )}
+
+            {/* Indexer + Rate for FIXED_INCOME / OTHER */}
+            {isEditValueBased && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Indexador <span className="text-muted-foreground text-[10px]">(opcional)</span></Label>
+                  <Select
+                    value={editForm.indexer ?? ""}
+                    onValueChange={v => setEditForm(f => ({ ...f, indexer: v, rate: "" }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Sem índice" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sem índice</SelectItem>
+                      {INDEXER_OPTIONS.map(o => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editForm.indexer && (
+                  <div className="space-y-1.5">
+                    <Label>{getRateLabel(editForm.indexer)}</Label>
+                    <Input
+                      type="number"
+                      value={editForm.rate ?? ""}
+                      onChange={e => setEditForm(f => ({ ...f, rate: e.target.value }))}
+                      min="0.01"
+                      step="0.01"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label>Obs.</Label>
               <Input value={editForm.notes ?? ""} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />

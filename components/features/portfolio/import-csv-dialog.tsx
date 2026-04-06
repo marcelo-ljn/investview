@@ -15,10 +15,10 @@ MXRF11,FII,200,10.20
 CDB Mercado Pago 110% CDI,FIXED_INCOME,1,100000
 Emprestimo Pessoal,OTHER,1,40000`
 
-const TX_EXAMPLE = `# Col 8 (custo_original) é opcional — use para RF com juros já embutidos no saldo
-CDB Mercado Pago 110% CDI,FIXED_INCOME,BUY,2025-11-07,1,107500,0,100000
-LCI LIG Inter 87% CDI,FIXED_INCOME,BUY,2025-11-24,1,132263,0
-LCI LIG Inter 87% CDI,FIXED_INCOME,SELL,2025-11-26,1,8000,0
+const TX_EXAMPLE = `# Cols 8-10 opcionais: custo_original, indexador, taxa
+CDB Mercado Pago 110% CDI,FIXED_INCOME,BUY,2025-11-07,1,107500,0,100000,CDI,110
+LCI LIG Inter 87% CDI,FIXED_INCOME,BUY,2025-11-24,1,132263,0,,CDI,87
+Emprestimo Pessoal 48x,OTHER,BUY,2026-02-02,1,40825.12,0,40000,PREFIXADO,24.5
 PETR4,STOCK,BUY,2025-01-15,100,32.50,5.00
 PETR4,STOCK,SELL,2025-06-01,50,42.00,5.00`
 
@@ -68,11 +68,13 @@ export function ImportCsvDialog({ portfolioId }: Props) {
     for (const line of lines) {
       const parts = line.split(",").map(s => s.trim())
       if (parts.length < 6) { setError(`Linha inválida (precisa de 6+ colunas): "${line}"`); return }
-      const [ticker, assetType, type, date, qtyStr, priceStr, feesStr, costOverrideStr] = parts
+      const [ticker, assetType, type, date, qtyStr, priceStr, feesStr, costOverrideStr, indexerStr, rateStr] = parts
       const quantity = parseFloat(qtyStr)
       const price = parseFloat(priceStr)
       const fees = parseFloat(feesStr ?? "0") || 0
       const costOverride = costOverrideStr ? parseFloat(costOverrideStr) : undefined
+      const indexerVal = indexerStr ? indexerStr.trim().toUpperCase() : undefined
+      const rateVal = rateStr ? parseFloat(rateStr.trim()) : undefined
 
       if (!ticker || !assetType || !type || !date || isNaN(quantity) || isNaN(price)) {
         setError(`Dados inválidos na linha: "${line}"`); return
@@ -81,6 +83,11 @@ export function ImportCsvDialog({ portfolioId }: Props) {
       const validTypes = ["BUY", "SELL", "DIVIDEND", "JCP", "AMORTIZATION", "SUBSCRIPTION"]
       if (!validTypes.includes(type.toUpperCase())) {
         setError(`Tipo de operação inválido "${type}". Use: ${validTypes.join(", ")}`); return
+      }
+
+      const validIndexers = ["CDI", "SELIC", "IPCA", "IGPM", "PREFIXADO", "IPCA_PLUS", "CDI_PLUS"]
+      if (indexerVal && !validIndexers.includes(indexerVal)) {
+        setError(`Indexador inválido "${indexerStr}". Use: ${validIndexers.join(", ")}`); return
       }
 
       transactions.push({
@@ -92,6 +99,8 @@ export function ImportCsvDialog({ portfolioId }: Props) {
         price,
         fees,
         ...(costOverride !== undefined && !isNaN(costOverride) ? { costOverride } : {}),
+        ...(indexerVal ? { indexer: indexerVal } : {}),
+        ...(rateVal !== undefined && !isNaN(rateVal) ? { rate: rateVal } : {}),
       })
     }
 
@@ -162,11 +171,11 @@ export function ImportCsvDialog({ portfolioId }: Props) {
           {mode === "transactions" ? (
             <div className="text-xs text-muted-foreground space-y-1 bg-muted/50 p-3 rounded-lg">
               <p className="font-medium text-foreground">Formato:</p>
-              <code className="block">TICKER, TIPO_ATIVO, OPERAÇÃO, DATA, QUANTIDADE, PREÇO, TAXAS[, CUSTO_ORIGINAL]</code>
-              <p className="mt-1">Tipos de ativo: <code>STOCK FII ETF CRYPTO FIXED_INCOME OTHER</code></p>
-              <p>Operações: <code>BUY SELL DIVIDEND JCP</code></p>
-              <p>Data: <code>AAAA-MM-DD</code> · Taxas opcionais (padrão: 0)</p>
-              <p>Col 8 opcional: custo original da RF (quando saldo já inclui juros acumulados)</p>
+              <code className="block">TICKER, TIPO, OP, DATA, QTDE, PREÇO, TAXAS[, CUSTO_ORIG[, INDEXADOR[, TAXA]]]</code>
+              <p className="mt-1">Tipos: <code>STOCK FII ETF CRYPTO FIXED_INCOME OTHER</code></p>
+              <p>Operações: <code>BUY SELL DIVIDEND JCP</code> · Data: <code>AAAA-MM-DD</code></p>
+              <p>Indexadores: <code>CDI SELIC IPCA IPCA_PLUS CDI_PLUS IGPM PREFIXADO</code></p>
+              <p>Taxa: % do índice (CDI/SELIC), spread a.a. (IPCA+/CDI+) ou taxa a.a. (PREFIXADO)</p>
               <p className="text-amber-400">⚡ Importar transações recalcula suas posições automaticamente do zero.</p>
             </div>
           ) : (
