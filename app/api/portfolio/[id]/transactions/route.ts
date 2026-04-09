@@ -17,6 +17,7 @@ const transactionSchema = z.object({
   costOverride: z.number().positive().optional(),
   indexer: z.enum(INDEXER_VALUES).optional(),
   rate: z.number().positive().optional(),
+  maturityDate: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       costOverride: data.costOverride,
       indexer: data.indexer,
       rate: data.rate,
+      maturityDate: data.maturityDate ? new Date(data.maturityDate) : undefined,
       notes: data.notes,
     },
   })

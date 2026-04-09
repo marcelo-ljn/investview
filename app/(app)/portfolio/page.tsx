@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { fetchMultipleQuotes } from "@/lib/brapi"
 import { fetchAllRates } from "@/lib/bcb"
-import { calcAccumulatedValue, getInvestedAt } from "@/lib/calc-accumulated"
+import { calcAccumulatedValue, getInvestedAt, getMaturityDate } from "@/lib/calc-accumulated"
 import { AddTransactionDialog } from "@/components/features/portfolio/add-transaction-dialog"
 import { ImportCsvDialog } from "@/components/features/portfolio/import-csv-dialog"
 import { PortfolioNotesDialog } from "@/components/features/portfolio/portfolio-notes-dialog"
@@ -95,6 +95,27 @@ export default async function PortfolioPage() {
     const quoteMap = new Map(quotes.map(q => [q.symbol, q]))
 
     const VALUE_BASED_TYPES = ["FIXED_INCOME", "OTHER"]
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Pre-fetch investedAt + maturityDate for all VALUE_BASED positions in one query
+    const valueBased = portfolio.positions.filter(p => VALUE_BASED_TYPES.includes(p.assetType))
+    const firstBuyMap = new Map<string, { investedAt: Date; maturityDate: Date | null }>()
+    if (valueBased.length > 0) {
+      const firstBuys = await prisma.transaction.findMany({
+        where: {
+          portfolioId: portfolio.id,
+          assetType: { in: ["FIXED_INCOME", "OTHER"] },
+          type: "BUY",
+        },
+        orderBy: { date: "asc" },
+      })
+      for (const tx of firstBuys) {
+        if (!firstBuyMap.has(tx.ticker)) {
+          firstBuyMap.set(tx.ticker, { investedAt: tx.date, maturityDate: tx.maturityDate ?? null })
+        }
+      }
+    }
 
     positions = await Promise.all(portfolio.positions.map(async (p) => {
       const isMarket = MARKET_TYPES.includes(p.assetType)
@@ -110,11 +131,10 @@ export default async function PortfolioPage() {
         currentPrice = p.quantity   // saldo
         currentValue = p.quantity   // default: static saldo
 
-        // Use CDI-compounded value if indexer is set
         if (p.indexer) {
-          const investedAt = await getInvestedAt(portfolio.id, p.ticker)
-          if (investedAt) {
-            const accumulated = await calcAccumulatedValue(totalCost, investedAt, p.indexer as Indexer, p.rate)
+          const txInfo = firstBuyMap.get(p.ticker)
+          if (txInfo) {
+            const accumulated = await calcAccumulatedValue(totalCost, txInfo.investedAt, p.indexer as Indexer, p.rate, txInfo.maturityDate)
             currentValue = accumulated
             currentPrice = accumulated
           }
@@ -139,6 +159,12 @@ export default async function PortfolioPage() {
       }
     }))
 
+    // Remove VALUE_BASED positions whose maturityDate has passed
+    positions = positions.filter(p => {
+      const info = firstBuyMap.get(p.ticker)
+      return !info?.maturityDate || info.maturityDate >= today
+    })
+
     const totalValue = positions.reduce((s, p) => s + p.currentValue, 0)
     const totalCost = positions.reduce((s, p) => s + p.totalCost, 0)
     const totalGain = totalValue - totalCost
@@ -146,10 +172,6 @@ export default async function PortfolioPage() {
     summary = { totalValue, totalCost, totalGain, totalGainPercent }
     positions = positions.map(p => ({ ...p, weight: totalValue > 0 ? (p.currentValue / totalValue) * 100 : 0 }))
     positions.sort((a, b) => b.currentValue - a.currentValue)
-
-    // Save today's snapshot (fire-and-forget, best-effort)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
     prisma.portfolioSnapshot.upsert({
       where: { portfolioId_date: { portfolioId: portfolio.id, date: today } },
       update: { totalValue, totalCost },

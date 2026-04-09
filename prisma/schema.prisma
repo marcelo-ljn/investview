@@ -395,6 +395,7 @@ model Transaction {
   costOverride Float?          // FIXED_INCOME/OTHER: custo original separado do saldo (amount)
   indexer      Indexer?        // Para FIXED_INCOME/OTHER: tipo de indexação
   rate         Float?          // CDI/SELIC: % do índice (ex: 110); CDI+/IPCA+/IGPM: spread a.a.; PREFIXADO: taxa a.a.
+  maturityDate DateTime?       @db.Date // Data de vencimento (FIXED_INCOME/OTHER); posição some após essa data
   notes        String?
   createdAt    DateTime        @default(now())
 

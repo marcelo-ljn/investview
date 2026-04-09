@@ -62,6 +62,7 @@ export function AddTransactionDialog({ portfolioId, onSuccess }: AddTransactionD
     notes: "",
     indexer: "",
     rate: "",
+    maturityDate: "",
   })
 
   const isManual = MANUAL_VALUE_TYPES.includes(form.assetType)
@@ -98,6 +99,7 @@ export function AddTransactionDialog({ portfolioId, onSuccess }: AddTransactionD
         body.rate = form.rate ? Number(form.rate) : undefined
         if (!body.rate) delete body.rate
       }
+      if (!isManual || !form.maturityDate) delete body.maturityDate
 
       const res = await fetch(`/api/portfolio/${portfolioId}/transactions`, {
         method: "POST",
@@ -106,7 +108,7 @@ export function AddTransactionDialog({ portfolioId, onSuccess }: AddTransactionD
       })
       if (res.ok) {
         setOpen(false)
-        setForm({ ticker: "", assetType: "STOCK", type: "BUY", date: new Date().toISOString().split("T")[0], quantity: "", price: "", fees: "0", notes: "", indexer: "", rate: "" })
+        setForm({ ticker: "", assetType: "STOCK", type: "BUY", date: new Date().toISOString().split("T")[0], quantity: "", price: "", fees: "0", notes: "", indexer: "", rate: "", maturityDate: "" })
         onSuccess?.()
         window.location.reload()
       }
@@ -211,38 +213,48 @@ export function AddTransactionDialog({ portfolioId, onSuccess }: AddTransactionD
               </div>
             )}
 
-            {/* Indexer + Rate fields for FIXED_INCOME / OTHER */}
+            {/* Indexer + Rate + MaturityDate fields for FIXED_INCOME / OTHER */}
             {isManual && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Indexador <span className="text-muted-foreground text-[10px]">(opcional)</span></Label>
-                  <Select
-                    value={form.indexer}
-                    onValueChange={v => setForm(f => ({ ...f, indexer: v, rate: "" }))}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Sem índice" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Sem índice</SelectItem>
-                      {INDEXER_OPTIONS.map(o => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {form.indexer && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label>{getRateLabel(form.indexer)}</Label>
-                    <Input
-                      type="number"
-                      placeholder={getRatePlaceholder(form.indexer)}
-                      value={form.rate}
-                      onChange={e => setForm(f => ({ ...f, rate: e.target.value }))}
-                      min="0.01"
-                      step="0.01"
-                    />
+                    <Label>Indexador <span className="text-muted-foreground text-[10px]">(opcional)</span></Label>
+                    <Select
+                      value={form.indexer}
+                      onValueChange={v => setForm(f => ({ ...f, indexer: v, rate: "" }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Sem índice" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Sem índice</SelectItem>
+                        {INDEXER_OPTIONS.map(o => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </div>
+                  {form.indexer && (
+                    <div className="space-y-1.5">
+                      <Label>{getRateLabel(form.indexer)}</Label>
+                      <Input
+                        type="number"
+                        placeholder={getRatePlaceholder(form.indexer)}
+                        value={form.rate}
+                        onChange={e => setForm(f => ({ ...f, rate: e.target.value }))}
+                        min="0.01"
+                        step="0.01"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Data de vencimento <span className="text-muted-foreground text-[10px]">(opcional — some da carteira após vencer)</span></Label>
+                  <Input
+                    type="date"
+                    value={form.maturityDate}
+                    onChange={e => setForm(f => ({ ...f, maturityDate: e.target.value }))}
+                  />
+                </div>
+              </>
             )}
 
             <div className="flex justify-end gap-2 pt-2">

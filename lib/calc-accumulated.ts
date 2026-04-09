@@ -18,18 +18,22 @@ export async function calcAccumulatedValue(
   principal: number,
   investedAt: Date,
   indexer: Indexer | null,
-  rate: number | null
+  rate: number | null,
+  maturityDate?: Date | null,
 ): Promise<number> {
   if (!indexer || rate == null) return principal
+
+  // Cap calculation at maturity date if it's in the past
+  const endDate = maturityDate && maturityDate < new Date() ? maturityDate : new Date()
 
   // PREFIXADO: simple compound using business-day convention (252/year)
   if (indexer === "PREFIXADO") {
     const dailyRates = await prisma.economicRate.findMany({
-      where: { name: "CDI", date: { gte: investedAt, lte: new Date() } },
+      where: { name: "CDI", date: { gte: investedAt, lte: endDate } },
       orderBy: { date: "asc" },
     })
     const numDays = dailyRates.length > 0 ? dailyRates.length : Math.floor(
-      (Date.now() - investedAt.getTime()) / (1000 * 60 * 60 * 24)
+      (endDate.getTime() - investedAt.getTime()) / (1000 * 60 * 60 * 24)
     )
     const dailyFactor = rate / 100 / 252
     return principal * Math.pow(1 + dailyFactor, numDays)
@@ -37,7 +41,7 @@ export async function calcAccumulatedValue(
 
   const rateType = indexer === "SELIC" ? "SELIC" : "CDI"
   const dailyRates = await prisma.economicRate.findMany({
-    where: { name: rateType, date: { gte: investedAt, lte: new Date() } },
+    where: { name: rateType, date: { gte: investedAt, lte: endDate } },
     orderBy: { date: "asc" },
   })
 
@@ -80,7 +84,8 @@ function getDailyEffectivePct(indexer: Indexer, rate: number, indexerValue: numb
 }
 
 /**
- * Get the investment start date for a position by finding the first BUY transaction.
+ * Get the investment start date and maturity date for a position
+ * by finding the first BUY transaction.
  */
 export async function getInvestedAt(
   portfolioId: string,
@@ -91,4 +96,15 @@ export async function getInvestedAt(
     orderBy: { date: "asc" },
   })
   return firstBuy?.date ?? null
+}
+
+export async function getMaturityDate(
+  portfolioId: string,
+  ticker: string
+): Promise<Date | null> {
+  const firstBuy = await prisma.transaction.findFirst({
+    where: { portfolioId, ticker, type: "BUY" },
+    orderBy: { date: "asc" },
+  })
+  return firstBuy?.maturityDate ?? null
 }

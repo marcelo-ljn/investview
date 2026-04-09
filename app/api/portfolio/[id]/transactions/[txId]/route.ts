@@ -16,6 +16,7 @@ const updateSchema = z.object({
   fees: z.number().min(0).optional(),
   indexer: z.enum(INDEXER_VALUES).nullable().optional(),
   rate: z.number().positive().nullable().optional(),
+  maturityDate: z.string().nullable().optional(),
   notes: z.string().optional(),
 })
 
@@ -62,6 +63,7 @@ export async function PATCH(
       ...(data.fees !== undefined && { fees: data.fees }),
       ...(data.indexer !== undefined && { indexer: data.indexer }),
       ...(data.rate !== undefined && { rate: data.rate }),
+      ...(data.maturityDate !== undefined && { maturityDate: data.maturityDate ? new Date(data.maturityDate) : null }),
       ...(data.notes !== undefined && { notes: data.notes }),
     },
   })

@@ -68,13 +68,14 @@ export function ImportCsvDialog({ portfolioId }: Props) {
     for (const line of lines) {
       const parts = line.split(",").map(s => s.trim())
       if (parts.length < 6) { setError(`Linha inválida (precisa de 6+ colunas): "${line}"`); return }
-      const [ticker, assetType, type, date, qtyStr, priceStr, feesStr, costOverrideStr, indexerStr, rateStr] = parts
+      const [ticker, assetType, type, date, qtyStr, priceStr, feesStr, costOverrideStr, indexerStr, rateStr, maturityDateStr] = parts
       const quantity = parseFloat(qtyStr)
       const price = parseFloat(priceStr)
       const fees = parseFloat(feesStr ?? "0") || 0
       const costOverride = costOverrideStr ? parseFloat(costOverrideStr) : undefined
       const indexerVal = indexerStr ? indexerStr.trim().toUpperCase() : undefined
       const rateVal = rateStr ? parseFloat(rateStr.trim()) : undefined
+      const maturityDateVal = maturityDateStr ? maturityDateStr.trim() : undefined
 
       if (!ticker || !assetType || !type || !date || isNaN(quantity) || isNaN(price)) {
         setError(`Dados inválidos na linha: "${line}"`); return
@@ -101,6 +102,7 @@ export function ImportCsvDialog({ portfolioId }: Props) {
         ...(costOverride !== undefined && !isNaN(costOverride) ? { costOverride } : {}),
         ...(indexerVal ? { indexer: indexerVal } : {}),
         ...(rateVal !== undefined && !isNaN(rateVal) ? { rate: rateVal } : {}),
+        ...(maturityDateVal ? { maturityDate: maturityDateVal } : {}),
       })
     }
 
@@ -171,7 +173,7 @@ export function ImportCsvDialog({ portfolioId }: Props) {
           {mode === "transactions" ? (
             <div className="text-xs text-muted-foreground space-y-1 bg-muted/50 p-3 rounded-lg">
               <p className="font-medium text-foreground">Formato:</p>
-              <code className="block">TICKER, TIPO, OP, DATA, QTDE, PREÇO, TAXAS[, CUSTO_ORIG[, INDEXADOR[, TAXA]]]</code>
+              <code className="block">TICKER, TIPO, OP, DATA, QTDE, PREÇO, TAXAS[, CUSTO_ORIG[, INDEXADOR[, TAXA[, VENCIMENTO]]]]</code>
               <p className="mt-1">Tipos: <code>STOCK FII ETF CRYPTO FIXED_INCOME OTHER</code></p>
               <p>Operações: <code>BUY SELL DIVIDEND JCP</code> · Data: <code>AAAA-MM-DD</code></p>
               <p>Indexadores: <code>CDI SELIC IPCA IPCA_PLUS CDI_PLUS IGPM PREFIXADO</code></p>

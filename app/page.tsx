@@ -6,7 +6,7 @@ import { TrendingUp, BarChart3, ShieldCheck, Zap } from "lucide-react"
 
 export default async function HomePage() {
   const session = await auth()
-  if (session) redirect("/dashboard")
+  if (session) redirect("/portfolio")
 
   return (
     <div className="min-h-screen bg-background">
