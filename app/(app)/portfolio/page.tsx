@@ -202,6 +202,9 @@ export default async function PortfolioPage() {
     price: t.price,
     fees: t.fees,
     costOverride: t.costOverride,
+    indexer: t.indexer,
+    rate: t.rate,
+    maturityDate: t.maturityDate ? t.maturityDate.toISOString() : null,
     notes: t.notes,
   }))
 

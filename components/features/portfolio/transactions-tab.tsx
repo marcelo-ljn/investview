@@ -20,6 +20,7 @@ interface Transaction {
   fees: number
   indexer?: string | null
   rate?: number | null
+  maturityDate?: string | Date | null
   notes?: string | null
 }
 
@@ -86,6 +87,7 @@ interface EditForm {
   date?: string | Date
   quantity?: number
   price?: number
+  maturityDate?: string
   fees?: number
   indexer?: string
   rate?: string
@@ -145,6 +147,7 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
       assetType: tx.assetType,
       type: tx.type,
       date: new Date(tx.date).toISOString().split("T")[0],
+      maturityDate: tx.maturityDate ? new Date(tx.maturityDate).toISOString().split("T")[0] : "",
       quantity: tx.quantity,
       price: tx.price,
       fees: tx.fees,
@@ -169,6 +172,11 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
       } else {
         delete body.indexer
         delete body.rate
+      }
+      if (isValueBased) {
+        body.maturityDate = editForm.maturityDate || null
+      } else {
+        delete body.maturityDate
       }
 
       const res = await fetch(`/api/portfolio/${portfolioId}/transactions/${editingTx.id}`, {
@@ -419,8 +427,9 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
               </div>
             )}
 
-            {/* Indexer + Rate for FIXED_INCOME / OTHER */}
+            {/* Indexer + Rate + MaturityDate for FIXED_INCOME / OTHER */}
             {isEditValueBased && (
+              <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Indexador <span className="text-muted-foreground text-[10px]">(opcional)</span></Label>
@@ -450,6 +459,15 @@ export function TransactionsTab({ transactions, portfolioId }: TransactionsTabPr
                   </div>
                 )}
               </div>
+              <div className="space-y-1.5">
+                <Label>Data de vencimento <span className="text-muted-foreground text-[10px]">(some da carteira após vencer)</span></Label>
+                <Input
+                  type="date"
+                  value={editForm.maturityDate ?? ""}
+                  onChange={e => setEditForm(f => ({ ...f, maturityDate: e.target.value }))}
+                />
+              </div>
+              </>
             )}
 
             <div className="space-y-1.5">
